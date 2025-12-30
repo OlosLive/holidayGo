@@ -5,8 +5,10 @@ Este guia fornece instruções detalhadas para desenvolvedores que desejam contr
 ## Índice
 
 - [Configuração do Ambiente](#configuração-do-ambiente)
+- [Configuração do Supabase](#configuração-do-supabase)
 - [Estrutura do Código](#estrutura-do-código)
 - [Guia de Estilo](#guia-de-estilo)
+- [Trabalhando com Hooks](#trabalhando-com-hooks)
 - [Adicionando Funcionalidades](#adicionando-funcionalidades)
 - [Variáveis de Ambiente](#variáveis-de-ambiente)
 - [Build e Deploy](#build-e-deploy)
@@ -24,6 +26,7 @@ Este guia fornece instruções detalhadas para desenvolvedores que desejam contr
 - **npm**: v9.0.0 ou superior (ou yarn/pnpm)
 - **Editor**: VS Code recomendado com extensões TypeScript e ESLint
 - **Git**: Para controle de versão
+- **Conta Supabase**: [supabase.com](https://supabase.com)
 
 ### Setup Inicial
 
@@ -40,21 +43,22 @@ cd holidayGo
 npm install
 ```
 
-3. **Configure variáveis de ambiente**
+3. **Configure o Supabase** (ver seção abaixo)
+
+4. **Configure variáveis de ambiente**
 
 Crie o arquivo `.env.local` na raiz:
 
 ```env
+# Supabase (obrigatório)
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua_chave_anon_aqui
+
+# Google Gemini AI (opcional)
 GEMINI_API_KEY=sua_chave_aqui
 ```
 
-Para obter uma chave da API Gemini:
-- Acesse [Google AI Studio](https://ai.google.dev/)
-- Crie um projeto
-- Gere uma API key
-- Cole no arquivo `.env.local`
-
-4. **Execute em modo desenvolvimento**
+5. **Execute em modo desenvolvimento**
 
 ```bash
 npm run dev
@@ -78,6 +82,58 @@ Acesse: `http://localhost:3000`
 
 ---
 
+## Configuração do Supabase
+
+### 1. Criar Projeto
+
+1. Acesse [supabase.com/dashboard](https://supabase.com/dashboard)
+2. Clique em **New Project**
+3. Preencha:
+   - **Name**: holidaygo (ou outro nome)
+   - **Database Password**: (guarde em local seguro)
+   - **Region**: Escolha a mais próxima
+4. Aguarde a criação (1-2 minutos)
+
+### 2. Executar Script SQL
+
+1. No Supabase Dashboard, acesse **SQL Editor**
+2. Clique em **New Query**
+3. Cole o conteúdo de `supabase/migrations/001_initial_schema.sql`
+4. Clique em **Run**
+
+O script cria:
+- Tabela `profiles` (colaboradores)
+- Tabela `vacations` (férias)
+- Políticas RLS (Row Level Security)
+- Triggers para timestamps e contadores
+
+### 3. Configurar Autenticação
+
+1. Acesse **Authentication > Providers**
+2. Verifique que **Email** está habilitado
+3. (Opcional) Em **Authentication > Settings**:
+   - Desabilite "Confirm email" para testes locais
+   - Configure URLs de redirecionamento
+
+### 4. Obter Credenciais
+
+1. Acesse **Settings > API**
+2. Copie:
+   - **Project URL**: `https://xxxxx.supabase.co`
+   - **anon public key**: `eyJhbG...`
+3. Cole no `.env.local`
+
+### 5. Verificar Configuração
+
+```bash
+# Testar conexão via curl
+curl "https://seu-projeto.supabase.co/rest/v1/profiles" \
+  -H "apikey: sua_anon_key" \
+  -H "Authorization: Bearer sua_anon_key"
+```
+
+---
+
 ## Estrutura do Código
 
 ### Diretórios e Arquivos
@@ -85,43 +141,142 @@ Acesse: `http://localhost:3000`
 ```
 holidayGo/
 │
-├── pages/                      # Páginas da aplicação
+├── lib/                       # Bibliotecas e clientes
+│   └── supabaseClient.ts      # Cliente Supabase configurado
+│
+├── contexts/                  # Contextos React
+│   └── AuthContext.tsx        # Contexto de autenticação
+│
+├── hooks/                     # Hooks personalizados
+│   ├── useAuth.ts             # Hook de autenticação
+│   ├── useProfiles.ts         # CRUD de colaboradores
+│   └── useVacations.ts        # Gestão de férias
+│
+├── components/                # Componentes reutilizáveis
+│   └── ProtectedRoute.tsx     # Proteção de rotas
+│
+├── pages/                     # Páginas da aplicação
 │   ├── Auth.tsx               # Página de autenticação
-│   ├── Dashboard.tsx          # Dashboard principal (calendários)
+│   ├── Dashboard.tsx          # Dashboard principal
 │   ├── Planning.tsx           # Planejamento interativo
 │   ├── Summary.tsx            # Resumo de saldos
 │   ├── Users.tsx              # Lista de usuários
-│   └── UserForm.tsx           # Formulário CRUD de usuário
+│   └── UserForm.tsx           # Formulário CRUD
+│
+├── types/                     # Definições TypeScript
+│   └── database.ts            # Tipos do banco Supabase
+│
+├── supabase/                  # Configurações Supabase
+│   ├── migrations/
+│   │   └── 001_initial_schema.sql
+│   └── seed.sql
 │
 ├── App.tsx                    # Componente raiz
 ├── index.tsx                  # Entry point React
-├── types.ts                   # Definições TypeScript
-├── constants.ts               # Dados iniciais mockados
-├── geminiService.ts           # Serviço de integração IA
+├── types.ts                   # Tipos gerais
+├── geminiService.ts           # Serviço de IA
 │
 ├── vite.config.ts             # Configuração Vite
 ├── tsconfig.json              # Configuração TypeScript
-├── package.json               # Dependências e scripts
-├── index.html                 # Template HTML
-│
-└── docs/                      # Documentação
-    ├── ARCHITECTURE.md        # Arquitetura do sistema
-    ├── DEVELOPMENT.md         # Este arquivo
-    ├── COMPONENTS.md          # Documentação de componentes
-    ├── API.md                 # API e tipos
-    └── USER_GUIDE.md          # Manual do usuário
+└── package.json               # Dependências e scripts
 ```
 
 ### Responsabilidades dos Arquivos
 
 | Arquivo | Responsabilidade |
 |---------|------------------|
-| `index.tsx` | Renderiza App no DOM |
-| `App.tsx` | Gerencia estado global, roteamento, tema |
-| `types.ts` | Interfaces e tipos TypeScript |
-| `constants.ts` | Dados de exemplo (INITIAL_USERS) |
-| `geminiService.ts` | Comunicação com Google Gemini AI |
-| `pages/*.tsx` | Componentes de página individuais |
+| `lib/supabaseClient.ts` | Instância do cliente Supabase |
+| `contexts/AuthContext.tsx` | Gerencia estado de autenticação |
+| `hooks/useProfiles.ts` | CRUD de colaboradores + realtime |
+| `hooks/useVacations.ts` | Gestão de férias + realtime |
+| `components/ProtectedRoute.tsx` | Protege rotas autenticadas |
+| `pages/*.tsx` | Componentes de página |
+| `types/database.ts` | Tipos TypeScript do banco |
+
+---
+
+## Trabalhando com Hooks
+
+### useAuth
+
+```typescript
+import { useAuth } from './contexts/AuthContext';
+
+const MyComponent = () => {
+  const { 
+    user,           // User | null
+    profile,        // Profile | null
+    loading,        // boolean
+    initialized,    // boolean
+    signIn,         // (email, password) => Promise
+    signUp,         // (email, password, name) => Promise
+    signOut,        // () => Promise
+    updateProfile,  // (updates) => Promise
+  } = useAuth();
+
+  const handleLogin = async () => {
+    const { error } = await signIn('email@example.com', 'password');
+    if (error) {
+      console.error('Login failed:', error.message);
+    }
+  };
+};
+```
+
+### useProfiles
+
+```typescript
+import { useProfiles } from './hooks/useProfiles';
+
+const UsersPage = () => {
+  const {
+    profiles,       // Profile[]
+    loading,        // boolean
+    error,          // string | null
+    fetchProfiles,  // () => Promise
+    getProfile,     // (id) => Promise<Profile | null>
+    createProfile,  // (data) => Promise<{ data, error }>
+    updateProfile,  // (id, updates) => Promise<{ error }>
+    deleteProfile,  // (id) => Promise<{ error }>
+  } = useProfiles();
+
+  if (loading) return <Spinner />;
+  if (error) return <Error message={error} />;
+
+  return (
+    <ul>
+      {profiles.map(p => (
+        <li key={p.id}>{p.name}</li>
+      ))}
+    </ul>
+  );
+};
+```
+
+### useVacations
+
+```typescript
+import { useVacations } from './hooks/useVacations';
+
+const PlanningPage = () => {
+  const {
+    vacations,          // Vacation[]
+    loading,            // boolean
+    error,              // string | null
+    getVacationDays,    // (userId, year, month) => number[]
+    toggleVacationDay,  // (userId, year, month, day) => Promise
+    addVacationDays,    // (userId, year, month, days[]) => Promise
+    removeVacationDays, // (userId, year, month, days[]) => Promise
+  } = useVacations();
+
+  const handleDayClick = async (day: number) => {
+    const { error } = await toggleVacationDay(userId, 2025, 7, day);
+    if (error) {
+      alert('Erro ao atualizar: ' + error);
+    }
+  };
+};
+```
 
 ---
 
@@ -133,29 +288,27 @@ holidayGo/
 
 ```typescript
 // Interfaces: PascalCase
-interface User {
+interface Profile {
   id: string;
   name: string;
 }
 
-// Types: PascalCase
-type UserStatus = 'Ativo' | 'Inativo' | 'Férias' | 'Pendente';
+// Types do banco: PascalCase
+type ProfileInsert = Database['public']['Tables']['profiles']['Insert'];
 
 // Componentes: PascalCase
 const Dashboard: React.FC<DashboardProps> = ({ users }) => {
   // ...
 };
 
+// Hooks: camelCase com prefixo 'use'
+const useProfiles = () => { ... };
+
 // Funções: camelCase
-const handleSubmit = (e: React.FormEvent) => {
-  // ...
-};
+const handleSubmit = (e: React.FormEvent) => { ... };
 
 // Constantes: UPPER_SNAKE_CASE
 const INITIAL_USERS: User[] = [...];
-
-// Variáveis: camelCase
-const selectedUser = users.find(u => u.id === id);
 ```
 
 #### Tipagem
@@ -163,97 +316,74 @@ const selectedUser = users.find(u => u.id === id);
 ```typescript
 // ✅ Sempre tipar props de componentes
 interface DashboardProps {
-  users: User[];
+  // Props são definidas via hooks agora
 }
 
-// ✅ Tipar estados explicitamente quando necessário
-const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-
-// ✅ Tipar retornos de funções complexas
-const generateSummary = async (users: User[]): Promise<string> => {
+// ✅ Tipar retornos de hooks
+interface UseProfilesReturn {
+  profiles: Profile[];
+  loading: boolean;
+  error: string | null;
   // ...
-};
+}
+
+// ✅ Usar tipos do banco
+import type { Profile, ProfileInsert } from '../types/database';
 
 // ❌ Evitar 'any'
 const data: any = {}; // Ruim!
 
 // ✅ Usar tipos específicos
-const data: Partial<User> = {}; // Bom!
+const data: Partial<Profile> = {}; // Bom!
 ```
 
 ### Convenções React
 
-#### Componentes Funcionais
+#### Hooks Order
 
 ```typescript
-// ✅ Formato padrão
-const ComponentName: React.FC<Props> = ({ prop1, prop2 }) => {
-  // Hooks no topo
-  const [state, setState] = useState(initialValue);
-  
-  // useEffect após useState
-  useEffect(() => {
-    // side effects
-  }, [dependencies]);
-  
-  // Funções auxiliares
-  const handleClick = () => {
-    // ...
-  };
-  
-  // Early returns para casos especiais
-  if (loading) return <Loading />;
-  
-  // JSX principal
-  return (
-    <div>
-      {/* ... */}
-    </div>
-  );
-};
-
-export default ComponentName;
-```
-
-#### Hooks
-
-```typescript
-// ✅ Ordem dos hooks (sempre a mesma)
 const Component = () => {
-  // 1. useState
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  
-  // 2. useEffect
-  useEffect(() => {
-    // ...
-  }, []);
-  
-  // 3. useMemo / useCallback
-  const computed = useMemo(() => {
-    return heavyCalculation(data);
-  }, [data]);
-  
-  // 4. Custom hooks (se houver)
+  // 1. Context hooks
   const { user } = useAuth();
   
-  return <div />;
+  // 2. Custom hooks
+  const { profiles, loading } = useProfiles();
+  
+  // 3. useState
+  const [filter, setFilter] = useState('');
+  
+  // 4. useMemo / useCallback
+  const filtered = useMemo(() => 
+    profiles.filter(p => p.name.includes(filter)),
+    [profiles, filter]
+  );
+  
+  // 5. useEffect
+  useEffect(() => {
+    // side effects
+  }, []);
+  
+  // 6. Handlers
+  const handleClick = () => { ... };
+  
+  // 7. Early returns
+  if (loading) return <Spinner />;
+  
+  // 8. JSX
+  return <div>...</div>;
 };
 ```
 
 ### Convenções CSS (Tailwind)
 
-#### Classes Ordenadas
-
 ```tsx
 // ✅ Ordem recomendada:
-// 1. Layout (flex, grid, block)
-// 2. Posição (relative, absolute)
-// 3. Tamanho (w-, h-, p-, m-)
-// 4. Tipografia (text-, font-)
-// 5. Cores (bg-, text-, border-)
-// 6. Estados (hover:, focus:, dark:)
-// 7. Animações (transition-, animate-)
+// 1. Layout (flex, grid)
+// 2. Tamanho (w-, h-, p-, m-)
+// 3. Tipografia (text-, font-)
+// 4. Cores (bg-, text-, border-)
+// 5. Estados (hover:, focus:, dark:)
+// 6. Animações (transition-)
 
 <div className="
   flex items-center gap-4
@@ -261,28 +391,9 @@ const Component = () => {
   text-sm font-bold
   bg-white dark:bg-slate-900
   border border-slate-200 dark:border-slate-800
-  rounded-lg
   hover:bg-slate-50
   transition-colors
 ">
-  Conteúdo
-</div>
-```
-
-#### Dark Mode
-
-```tsx
-// ✅ Sempre incluir variante dark
-<div className="bg-white dark:bg-slate-900">
-  <p className="text-slate-900 dark:text-white">Texto</p>
-</div>
-
-// ✅ Usar classes de dark mode consistentes
-dark:bg-surface-dark     // Fundos de cards
-dark:bg-slate-900        // Fundos principais
-dark:text-white          // Texto principal
-dark:text-slate-400      // Texto secundário
-dark:border-slate-800    // Bordas
 ```
 
 ---
@@ -291,22 +402,26 @@ dark:border-slate-800    // Bordas
 
 ### Como Adicionar uma Nova Página
 
-1. **Crie o componente na pasta `pages/`**
+1. **Crie o componente em `pages/`**
 
 ```typescript
 // pages/Reports.tsx
 import React from 'react';
-import { User } from '../types';
+import { useProfiles } from '../hooks/useProfiles';
+import { useVacations } from '../hooks/useVacations';
 
-interface ReportsProps {
-  users: User[];
-}
+const Reports: React.FC = () => {
+  const { profiles, loading: profilesLoading } = useProfiles();
+  const { vacations, loading: vacationsLoading } = useVacations();
 
-const Reports: React.FC<ReportsProps> = ({ users }) => {
+  if (profilesLoading || vacationsLoading) {
+    return <div>Carregando...</div>;
+  }
+
   return (
     <div className="py-8 px-4 max-w-7xl mx-auto">
       <h1 className="text-3xl font-black dark:text-white">Relatórios</h1>
-      {/* Seu conteúdo aqui */}
+      {/* Conteúdo */}
     </div>
   );
 };
@@ -314,114 +429,73 @@ const Reports: React.FC<ReportsProps> = ({ users }) => {
 export default Reports;
 ```
 
-2. **Importe no App.tsx**
+2. **Adicione a rota em `App.tsx`**
 
 ```typescript
 import Reports from './pages/Reports';
+
+// Dentro de <Routes>
+<Route path="/reports" element={
+  <ProtectedRoute><Reports /></ProtectedRoute>
+} />
 ```
 
-3. **Adicione a rota**
+3. **Adicione link na Navbar**
 
-```typescript
-<Routes>
-  {/* Rotas existentes */}
-  <Route path="/reports" element={<Reports users={users} />} />
-</Routes>
+### Como Adicionar um Novo Campo ao Banco
+
+1. **Atualize o schema SQL**
+
+```sql
+-- Nova migration
+ALTER TABLE profiles ADD COLUMN phone_number TEXT;
 ```
 
-4. **Adicione link na Navbar**
+2. **Atualize os tipos em `types/database.ts`**
 
 ```typescript
-<Link
-  to="/reports"
-  className={`${isActive('/reports') ? 'border-primary text-slate-900 dark:text-white' : 'border-transparent text-slate-500'} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold`}
->
-  Relatórios
-</Link>
-```
-
-### Como Adicionar um Novo Campo ao User
-
-1. **Atualize a interface em `types.ts`**
-
-```typescript
-export interface User {
-  id: string;
-  name: string;
+export interface Profile {
   // ... campos existentes
-  phoneNumber?: string; // Novo campo
+  phone_number?: string | null;
 }
 ```
 
-2. **Atualize `constants.ts`**
+3. **Atualize os formulários**
+
+### Como Adicionar um Novo Hook
 
 ```typescript
-export const INITIAL_USERS: User[] = [
-  {
-    id: '1',
-    name: 'Allan',
-    // ... campos existentes
-    phoneNumber: '(11) 98765-4321', // Adicione aos usuários
-  },
-  // ...
-];
-```
+// hooks/useReports.ts
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
-3. **Atualize o formulário em `UserForm.tsx`**
+export const useReports = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-```typescript
-const [formData, setFormData] = useState<Partial<User>>({
-  // ... campos existentes
-  phoneNumber: '',
-});
+  const fetchReports = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('vacations')
+        .select('*, profiles(name)')
+        .order('vacation_date');
 
-// No JSX
-<input
-  type="tel"
-  value={formData.phoneNumber}
-  onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })}
-  placeholder="(00) 00000-0000"
-  className="form-input rounded-lg"
-/>
-```
+      if (error) throw error;
+      setData(data || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-4. **Atualize a exibição onde necessário**
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
-```typescript
-// Em Users.tsx, Dashboard.tsx, etc.
-<span>{user.phoneNumber}</span>
-```
-
-### Como Adicionar um Novo Serviço
-
-1. **Crie o arquivo do serviço**
-
-```typescript
-// notificationService.ts
-export const sendNotification = async (
-  userId: string, 
-  message: string
-): Promise<boolean> => {
-  try {
-    // Lógica do serviço
-    return true;
-  } catch (error) {
-    console.error('Notification error:', error);
-    return false;
-  }
-};
-```
-
-2. **Use no componente**
-
-```typescript
-import { sendNotification } from '../notificationService';
-
-const handleApprove = async () => {
-  const success = await sendNotification(user.id, 'Férias aprovadas!');
-  if (success) {
-    // Atualizar UI
-  }
+  return { data, loading, error, fetchReports };
 };
 ```
 
@@ -432,24 +506,22 @@ const handleApprove = async () => {
 ### Arquivo `.env.local`
 
 ```env
-# API Key do Google Gemini
-GEMINI_API_KEY=AIzaSy...
+# Supabase (obrigatório)
+VITE_SUPABASE_URL=https://xxxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 
-# Outras variáveis (exemplo)
-# VITE_API_URL=https://api.example.com
-# VITE_APP_ENV=development
+# Google Gemini AI (opcional)
+GEMINI_API_KEY=AIzaSy...
 ```
 
 ### Acessando no Código
 
 ```typescript
-// Configurado no vite.config.ts
-define: {
-  'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-}
+// Variáveis VITE_* estão disponíveis via import.meta.env
+const url = import.meta.env.VITE_SUPABASE_URL;
 
-// Uso no código
-const apiKey = process.env.API_KEY;
+// Variáveis sem VITE_ são processadas pelo vite.config.ts
+const apiKey = process.env.API_KEY; // Injetada no build
 ```
 
 ### Segurança
@@ -469,55 +541,23 @@ const apiKey = process.env.API_KEY;
 ### Build Local
 
 ```bash
-# Gerar build de produção
-npm run build
-
-# Testar build localmente
-npm run preview
+npm run build    # Gera build de produção
+npm run preview  # Testa build localmente
 ```
 
-Arquivos gerados em: `dist/`
+### Deploy com Supabase
 
-### Deploy
-
-#### Opção 1: Vercel
-
-```bash
-npm install -g vercel
-vercel --prod
-```
-
-#### Opção 2: Netlify
-
-```bash
-npm install -g netlify-cli
-netlify deploy --prod --dir=dist
-```
-
-#### Opção 3: GitHub Pages
-
-1. Configure no `vite.config.ts`:
-
-```typescript
-export default defineConfig({
-  base: '/holidayGo/', // Nome do repositório
-  // ...
-});
-```
-
-2. Build e deploy:
-
-```bash
-npm run build
-# Use gh-pages ou publique manualmente a pasta dist/
-```
+1. Configure variáveis de ambiente no serviço de hosting
+2. A mesma instância Supabase serve dev e produção
+3. Use branches do Supabase para staging (opcional)
 
 ### Variáveis de Ambiente em Produção
 
-Configure as variáveis no painel do serviço de hosting:
-
-- **Vercel**: Settings → Environment Variables
-- **Netlify**: Site settings → Build & deploy → Environment
+| Serviço | Onde configurar |
+|---------|----------------|
+| Vercel | Settings → Environment Variables |
+| Netlify | Site settings → Build & deploy → Environment |
+| Railway | Variables tab |
 
 ---
 
@@ -525,280 +565,141 @@ Configure as variáveis no painel do serviço de hosting:
 
 ### React DevTools
 
-Instale a extensão [React DevTools](https://react.dev/learn/react-developer-tools):
-
 - Inspecione componentes
-- Veja props e state em tempo real
+- Veja state de hooks customizados
 - Trace re-renders
 
-### Vite DevTools
+### Supabase Dashboard
 
-Console do navegador mostra:
-- Hot Module Replacement (HMR) logs
-- Erros de compilação TypeScript
-- Avisos do React
+- **Table Editor**: Visualize e edite dados
+- **Logs**: Veja requisições e erros
+- **Auth**: Gerencie usuários
 
-### Debugging TypeScript
-
-```typescript
-// Use console.log estratégico
-console.log('User data:', user);
-
-// Use debugger;
-const handleClick = () => {
-  debugger; // Pausa execução
-  // ...
-};
-
-// TypeScript type checking
-// Execute: npx tsc --noEmit
-```
-
-### Source Maps
-
-Habilitadas automaticamente em dev mode. Para produção:
+### Console do Navegador
 
 ```typescript
-// vite.config.ts
-export default defineConfig({
-  build: {
-    sourcemap: true, // Gera source maps
-  },
-});
+// Logs úteis para debug
+console.log('Profiles:', profiles);
+console.log('Auth state:', { user, loading, initialized });
 ```
+
+### Network Tab
+
+- Verifique requisições ao Supabase
+- Confirme headers de autenticação
+- Analise payloads e respostas
 
 ---
 
 ## Troubleshooting
 
-### Problema: "Cannot find module"
+### Problema: Tela de carregamento infinita
 
-**Causa**: Dependência não instalada ou caminho incorreto
-
-**Solução**:
-```bash
-npm install
-# ou
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Problema: "Port 3000 is already in use"
-
-**Causa**: Outra aplicação usando a porta
-
-**Solução 1**: Mude a porta em `vite.config.ts`:
-```typescript
-server: {
-  port: 3001,
-}
-```
-
-**Solução 2**: Finalize o processo:
-```bash
-# Linux/Mac
-lsof -ti:3000 | xargs kill -9
-
-# Windows
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-```
-
-### Problema: Gemini API retorna erro 401
-
-**Causa**: API key inválida ou não configurada
+**Causas**:
+1. Variáveis de ambiente não configuradas
+2. URL ou chave do Supabase incorretas
+3. Projeto Supabase pausado
 
 **Solução**:
-1. Verifique o arquivo `.env.local`
-2. Confirme que a chave está ativa no [AI Studio](https://ai.google.dev/)
-3. Reinicie o servidor dev: `npm run dev`
+1. Verifique `.env.local`
+2. Reinicie o servidor: `npm run dev`
+3. Verifique status do projeto no Supabase Dashboard
 
-### Problema: Dark mode não funciona
+### Problema: Erro de autenticação
 
-**Causa**: Classe 'dark' não aplicada no HTML
-
-**Solução**: Verifique o useEffect no App.tsx:
-```typescript
-useEffect(() => {
-  if (isDarkMode) {
-    document.documentElement.classList.add('dark');
-  } else {
-    document.documentElement.classList.remove('dark');
-  }
-}, [isDarkMode]);
-```
-
-### Problema: Tipos TypeScript não reconhecidos
-
-**Causa**: Cache do TypeScript desatualizado
+**Causas**:
+1. Email Auth desabilitado
+2. Credenciais incorretas
+3. Usuário não confirmado
 
 **Solução**:
-```bash
-# VS Code: Ctrl+Shift+P → "TypeScript: Restart TS Server"
+1. Habilite Email Auth no Supabase
+2. Desabilite "Confirm email" para testes
+3. Verifique logs no Authentication
 
-# Ou recompile
-npx tsc --noEmit
+### Problema: Dados não aparecem
+
+**Causas**:
+1. RLS bloqueando acesso
+2. Usuário não autenticado
+3. Tabelas não criadas
+
+**Solução**:
+1. Verifique políticas RLS no SQL Editor
+2. Confirme login na aplicação
+3. Execute o script de migration
+
+### Problema: Real-time não funciona
+
+**Causas**:
+1. Realtime não habilitado na tabela
+2. Subscription não configurada
+
+**Solução**:
+```sql
+-- Habilitar realtime na tabela
+ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE vacations;
 ```
 
 ---
 
 ## Boas Práticas
 
-### 1. Sempre Tipar Props
+### 1. Use os Hooks Corretamente
 
 ```typescript
-// ❌ Ruim
-const Component = ({ data }) => {
-  // ...
-};
+// ✅ Hook no topo do componente
+const { profiles, loading } = useProfiles();
 
-// ✅ Bom
-interface ComponentProps {
-  data: User[];
+// ❌ Nunca use hooks condicionalmente
+if (someCondition) {
+  const { profiles } = useProfiles(); // ERRO!
 }
-
-const Component: React.FC<ComponentProps> = ({ data }) => {
-  // ...
-};
 ```
 
-### 2. Extrair Lógica Complexa
+### 2. Trate Loading e Erros
 
 ```typescript
-// ❌ Ruim - Lógica no JSX
-<div>
-  {users.filter(u => u.status === 'Ativo' && u.vacationBalance > 30).map(u => (
-    <span key={u.id}>{u.name}</span>
-  ))}
-</div>
+const { profiles, loading, error } = useProfiles();
 
-// ✅ Bom - Lógica extraída
-const activeUsersWithBalance = users.filter(
-  u => u.status === 'Ativo' && u.vacationBalance > 30
-);
-
-<div>
-  {activeUsersWithBalance.map(u => (
-    <span key={u.id}>{u.name}</span>
-  ))}
-</div>
+if (loading) return <Spinner />;
+if (error) return <Error message={error} />;
+return <ProfileList profiles={profiles} />;
 ```
 
-### 3. Usar useMemo para Cálculos Pesados
+### 3. Use Optimistic Updates
 
 ```typescript
-// ✅ Evita recalcular a cada render
-const sortedUsers = useMemo(() => {
-  return users.sort((a, b) => 
-    a.vacationBalance - b.vacationBalance
-  );
-}, [users]);
+// Atualiza UI imediatamente
+setProfiles(prev => [...prev, newProfile]);
+
+// Persiste no banco
+const { error } = await createProfile(newProfile);
+
+// Reverte se erro
+if (error) {
+  setProfiles(prev => prev.filter(p => p.id !== newProfile.id));
+}
 ```
 
-### 4. Sempre Usar Keys em Listas
+### 4. Mantenha Tipos Atualizados
 
 ```typescript
-// ❌ Ruim
-{users.map(user => (
-  <div>{user.name}</div>
-))}
-
-// ✅ Bom
-{users.map(user => (
-  <div key={user.id}>{user.name}</div>
-))}
+// Sempre use tipos do database.ts
+import type { Profile, Vacation } from '../types/database';
 ```
 
-### 5. Componentizar Elementos Repetidos
-
-```typescript
-// ✅ Criar componente reutilizável
-const UserCard: React.FC<{ user: User }> = ({ user }) => (
-  <div className="card">
-    <h3>{user.name}</h3>
-    <p>{user.role}</p>
-  </div>
-);
-
-// Usar em múltiplos lugares
-<UserCard user={user} />
-```
-
-### 6. Limpar Side Effects
+### 5. Limpe Subscriptions
 
 ```typescript
 useEffect(() => {
-  const timer = setTimeout(() => {
-    // ...
-  }, 1000);
+  const channel = supabase.channel('...');
   
-  // ✅ Cleanup
-  return () => clearTimeout(timer);
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }, []);
-```
-
-### 7. Validar Dados de Entrada
-
-```typescript
-const handleSubmit = (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  // ✅ Validações
-  if (!formData.name) {
-    alert('Nome é obrigatório');
-    return;
-  }
-  
-  if (!formData.email.includes('@')) {
-    alert('Email inválido');
-    return;
-  }
-  
-  // Processar
-};
-```
-
-### 8. Usar Early Returns
-
-```typescript
-// ✅ Melhora legibilidade
-const Component = ({ data }) => {
-  if (!data) return null;
-  if (data.length === 0) return <Empty />;
-  
-  return <List data={data} />;
-};
-```
-
-### 9. Comentar Código Complexo
-
-```typescript
-// ✅ Explicar lógicas não óbvias
-// Mock data for months other than the selected one
-// Uses user ID + month index to generate pseudo-random values
-const mockDays = (parseInt(user.id) + monthIdx) % 7;
-return mockDays > 4 ? 0 : mockDays;
-```
-
-### 10. Manter Componentes Pequenos
-
-**Regra de ouro**: Se um componente passa de 300 linhas, considere dividir.
-
-```typescript
-// ❌ Componente muito grande (500+ linhas)
-const Dashboard = () => {
-  // Muita lógica
-  // Muito JSX
-};
-
-// ✅ Dividir em subcomponentes
-const Dashboard = () => (
-  <>
-    <DashboardHeader />
-    <DashboardStats />
-    <DashboardTable />
-  </>
-);
 ```
 
 ---
@@ -808,61 +709,23 @@ const Dashboard = () => (
 ```json
 {
   "scripts": {
-    "dev": "vite",                    // Servidor dev
-    "build": "vite build",            // Build produção
-    "preview": "vite preview",        // Preview do build
-    "type-check": "tsc --noEmit",     // Checar tipos
-    "lint": "eslint . --ext ts,tsx"   // Lint (se configurado)
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
   }
 }
 ```
-
-### Executar
-
-```bash
-npm run dev         # Desenvolvimento
-npm run build       # Produção
-npm run preview     # Testar build
-npm run type-check  # Validar TypeScript
-```
-
----
-
-## Estrutura de Commits
-
-Use [Conventional Commits](https://www.conventionalcommits.org/):
-
-```bash
-# Formato
-<tipo>(<escopo>): <descrição>
-
-# Exemplos
-feat(dashboard): adiciona visualização anual
-fix(planning): corrige seleção de datas
-docs(readme): atualiza instruções de instalação
-style(ui): ajusta espaçamentos no dark mode
-refactor(users): simplifica lógica de filtros
-```
-
-**Tipos**:
-- `feat`: Nova funcionalidade
-- `fix`: Correção de bug
-- `docs`: Documentação
-- `style`: Formatação (não afeta código)
-- `refactor`: Refatoração
-- `test`: Testes
-- `chore`: Tarefas gerais
 
 ---
 
 ## Recursos Adicionais
 
+- [Supabase Docs](https://supabase.com/docs)
 - [React Docs](https://react.dev/)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [Vite Guide](https://vitejs.dev/guide/)
 - [Tailwind CSS Docs](https://tailwindcss.com/docs)
-- [React Router Docs](https://reactrouter.com/)
-- [Google Gemini AI Docs](https://ai.google.dev/docs)
 
 ---
 
@@ -876,6 +739,4 @@ Após dominar este guia, consulte:
 
 ---
 
-**Dúvidas?** Abra uma issue ou consulte a documentação completa em `/docs`.
-
-
+**Dúvidas?** Abra uma issue ou consulte a documentação do Supabase.

@@ -1,55 +1,152 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { User, UserStatus } from '../types';
+import { useProfiles } from '../hooks/useProfiles';
+import { useAuth } from '../hooks/useAuth';
+import type { ProfileUpdate } from '../types/database';
 
-interface UserFormProps {
-  users?: User[];
-  onSave: (user: User) => void;
+type UserStatus = 'Ativo' | 'Inativo' | 'Férias' | 'Pendente';
+
+interface FormData {
+  name: string;
+  email: string;
+  role: string;
+  department: string;
+  hire_date: string;
+  status: UserStatus;
+  vacation_balance: number;
+  vacation_used: number;
 }
 
-const UserForm: React.FC<UserFormProps> = ({ users, onSave }) => {
+const UserForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { getProfile, createProfile, updateProfile } = useProfiles();
+  const { user } = useAuth();
   const isEditing = !!id;
 
-  const [formData, setFormData] = useState<Partial<User>>({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
     role: '',
     department: '',
-    hireDate: '',
+    hire_date: '',
     status: 'Ativo',
-    vacationBalance: 30,
-    vacationUsed: 0,
-    plannedVacations: []
+    vacation_balance: 30,
+    vacation_used: 0,
   });
 
-  useEffect(() => {
-    if (isEditing && users) {
-      const user = users.find(u => u.id === id);
-      if (user) setFormData(user);
-    }
-  }, [id, users, isEditing]);
+  const [loading, setLoading] = useState(isEditing);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newUser: User = {
-      id: isEditing ? (id as string) : Math.random().toString(36).substr(2, 9),
-      name: formData.name || '',
-      email: formData.email || '',
-      role: formData.role || '',
-      department: formData.department || '',
-      hireDate: formData.hireDate || '',
-      status: (formData.status as UserStatus) || 'Ativo',
-      vacationBalance: Number(formData.vacationBalance) || 0,
-      vacationUsed: Number(formData.vacationUsed) || 0,
-      plannedVacations: formData.plannedVacations || [],
-      lastAccess: isEditing ? formData.lastAccess : 'Nunca'
+  // Load profile data when editing
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!isEditing || !id) return;
+      
+      setLoading(true);
+      const profile = await getProfile(id);
+      
+      if (profile) {
+        setFormData({
+          name: profile.name,
+          email: profile.email,
+          role: profile.role || '',
+          department: profile.department || '',
+          hire_date: profile.hire_date || '',
+          status: profile.status as UserStatus,
+          vacation_balance: profile.vacation_balance,
+          vacation_used: profile.vacation_used,
+        });
+      } else {
+        setError('Colaborador não encontrado');
+      }
+      
+      setLoading(false);
     };
-    onSave(newUser);
-    navigate('/users');
+
+    loadProfile();
+  }, [id, isEditing, getProfile]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      if (isEditing && id) {
+        // Update existing profile
+        const updates: ProfileUpdate = {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role || null,
+          department: formData.department || null,
+          hire_date: formData.hire_date || null,
+          status: formData.status,
+          vacation_balance: formData.vacation_balance,
+          vacation_used: formData.vacation_used,
+        };
+
+        const { error } = await updateProfile(id, updates);
+        
+        if (error) {
+          setError(error);
+          return;
+        }
+      } else {
+        // Create new profile
+        // Note: In a real scenario, you'd typically create a user through Auth first
+        // For now, we'll use the current user's ID as a placeholder
+        // This should be updated based on your actual user creation flow
+        
+        if (!user) {
+          setError('Você precisa estar logado para criar um colaborador');
+          return;
+        }
+
+        // Generate a new UUID for the profile
+        // In production, this should come from creating a new auth user
+        const newId = crypto.randomUUID();
+        
+        const { error } = await createProfile({
+          id: newId,
+          name: formData.name,
+          email: formData.email,
+          role: formData.role || null,
+          department: formData.department || null,
+          hire_date: formData.hire_date || null,
+          status: formData.status,
+          vacation_balance: formData.vacation_balance,
+          vacation_used: formData.vacation_used,
+        });
+
+        if (error) {
+          setError(error);
+          return;
+        }
+      }
+
+      navigate('/users');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar colaborador');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <p className="text-slate-500 dark:text-slate-400 font-medium">Carregando dados...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
@@ -78,6 +175,22 @@ const UserForm: React.FC<UserFormProps> = ({ users, onSave }) => {
           Voltar
         </button>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3">
+            <span className="material-icons-round text-red-500">error</span>
+            <p className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</p>
+            <button 
+              onClick={() => setError(null)}
+              className="ml-auto text-red-500 hover:text-red-700"
+            >
+              <span className="material-icons-round text-lg">close</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-surface-dark rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="p-8 space-y-8">
@@ -114,7 +227,6 @@ const UserForm: React.FC<UserFormProps> = ({ users, onSave }) => {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">Cargo</label>
                 <input
-                  required
                   value={formData.role}
                   onChange={e => setFormData({ ...formData, role: e.target.value })}
                   placeholder="Ex: Designer Senior"
@@ -151,7 +263,6 @@ const UserForm: React.FC<UserFormProps> = ({ users, onSave }) => {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">Departamento</label>
                 <input
-                  required
                   value={formData.department}
                   onChange={e => setFormData({ ...formData, department: e.target.value })}
                   placeholder="Ex: Tecnologia"
@@ -161,19 +272,29 @@ const UserForm: React.FC<UserFormProps> = ({ users, onSave }) => {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-500 uppercase">Data de Admissão</label>
                 <input
-                  required
                   type="date"
-                  value={formData.hireDate}
-                  onChange={e => setFormData({ ...formData, hireDate: e.target.value })}
+                  value={formData.hire_date}
+                  onChange={e => setFormData({ ...formData, hire_date: e.target.value })}
                   className="form-input rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase">Direito Anual (Dias)</label>
+                <label className="text-xs font-bold text-slate-500 uppercase">Saldo de Férias (Dias)</label>
                 <input
                   type="number"
-                  value={formData.vacationBalance}
-                  onChange={e => setFormData({ ...formData, vacationBalance: Number(e.target.value) })}
+                  min="0"
+                  value={formData.vacation_balance}
+                  onChange={e => setFormData({ ...formData, vacation_balance: Number(e.target.value) })}
+                  className="form-input rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-slate-500 uppercase">Férias Utilizadas (Dias)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.vacation_used}
+                  onChange={e => setFormData({ ...formData, vacation_used: Number(e.target.value) })}
                   className="form-input rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary"
                 />
               </div>
@@ -191,9 +312,17 @@ const UserForm: React.FC<UserFormProps> = ({ users, onSave }) => {
           </button>
           <button
             type="submit"
-            className="px-8 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-primary/20 transition-all"
+            disabled={saving}
+            className="px-8 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            {isEditing ? 'Salvar Alterações' : 'Criar Usuário'}
+            {saving ? (
+              <>
+                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Salvando...</span>
+              </>
+            ) : (
+              <span>{isEditing ? 'Salvar Alterações' : 'Criar Usuário'}</span>
+            )}
           </button>
         </div>
       </form>

@@ -1,25 +1,105 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
+  const { signIn, signUp, user, loading: authLoading, initialized, error: authError } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Form fields
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already logged in
+  useEffect(() => {
+    if (initialized && user) {
+      navigate('/dashboard');
+    }
+  }, [user, initialized, navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate a network request
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      if (mode === 'login') {
+        const { error: signInError } = await signIn(email, password);
+        
+        if (signInError) {
+          setError(translateError(signInError.message));
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        const { error: signUpError } = await signUp(email, password, name);
+        if (signUpError) {
+          setError(translateError(signUpError.message));
+        } else {
+          setError(null);
+          alert('Conta criada com sucesso! Verifique seu email para confirmar o cadastro.');
+          setMode('login');
+        }
+      }
+    } catch {
+      setError('Ocorreu um erro inesperado. Tente novamente.');
+    } finally {
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 800);
+    }
+  };
+
+  const translateError = (message: string): string => {
+    const errorMap: Record<string, string> = {
+      'Invalid login credentials': 'Email ou senha incorretos',
+      'Email not confirmed': 'Email não confirmado. Verifique sua caixa de entrada.',
+      'User already registered': 'Este email já está cadastrado',
+      'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres',
+      'Unable to validate email address: invalid format': 'Formato de email inválido',
+    };
+    return errorMap[message] || message;
   };
 
   const toggleMode = () => {
     setMode(prev => prev === 'login' ? 'register' : 'login');
+    setError(null);
   };
+
+  // Show loading while checking auth state (with timeout message)
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950">
+        <div className="flex flex-col items-center gap-4 max-w-md px-4">
+          {authError ? (
+            <>
+              <span className="material-icons-round text-yellow-500 text-4xl">warning</span>
+              <p className="text-slate-700 dark:text-slate-300 font-medium text-center">
+                Não foi possível conectar ao servidor de autenticação.
+              </p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm text-center">
+                {authError}
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 px-6 py-2 bg-primary text-white rounded-lg font-bold"
+              >
+                Tentar novamente
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="h-10 w-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+              <p className="text-slate-500 dark:text-slate-400 font-medium">Carregando...</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white dark:bg-slate-950">
@@ -45,6 +125,16 @@ const Auth: React.FC = () => {
             </p>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-3">
+                <span className="material-icons-round text-red-500">error</span>
+                <p className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</p>
+              </div>
+            </div>
+          )}
+
           <form className="space-y-5" onSubmit={handleSubmit}>
             {mode === 'register' && (
               <div className="space-y-1.5 animate-in fade-in zoom-in-95 duration-300">
@@ -54,6 +144,8 @@ const Auth: React.FC = () => {
                   <input 
                     type="text" 
                     required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome"
                     className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
                   />
@@ -68,7 +160,8 @@ const Auth: React.FC = () => {
                 <input 
                   type="email" 
                   required
-                  defaultValue={mode === 'login' ? "admin@holidaygo.com" : ""}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@empresa.com"
                   className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
                 />
@@ -82,8 +175,10 @@ const Auth: React.FC = () => {
                 <input 
                   type="password" 
                   required
-                  defaultValue={mode === 'login' ? "password" : ""}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  minLength={6}
                   className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
                 />
               </div>

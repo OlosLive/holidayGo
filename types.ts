@@ -1,3 +1,5 @@
+// Legacy types for backward compatibility with geminiService
+// New code should use types from types/database.ts
 
 export type UserStatus = 'Ativo' | 'Inativo' | 'Férias' | 'Pendente';
 
@@ -22,3 +24,6 @@ export interface SummaryData {
   remaining: number;
   status: 'Normal' | 'Crítico' | 'Bom' | 'Atenção';
 }
+
+// Re-export database types for convenience
+export type { Profile, Vacation } from './types/database';

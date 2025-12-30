@@ -1,29 +1,45 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { User } from '../types';
+import { useProfiles } from '../hooks/useProfiles';
+import { useVacations } from '../hooks/useVacations';
+import type { Profile } from '../types/database';
 
-interface PlanningProps {
-  users: User[];
-  onUpdate: (user: User) => void;
-}
-
-const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
+const Planning: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { profiles, loading: profilesLoading, error: profilesError } = useProfiles();
+  const { 
+    vacations,
+    loading: vacationsLoading, 
+    error: vacationsError,
+    getVacationDays,
+    toggleVacationDay
+  } = useVacations();
+  
+  const [savingDay, setSavingDay] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   
   // Read month and year from URL query params
   const [selectedMonth, setSelectedMonth] = useState<number>(() => {
     const month = searchParams.get('month');
-    return month ? parseInt(month) : 6; // Default: Julho (0-indexed)
+    return month ? parseInt(month) : new Date().getMonth(); // Current month (0-indexed)
   });
   
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     const year = searchParams.get('year');
-    return year ? parseInt(year) : 2026;
+    return year ? parseInt(year) : new Date().getFullYear();
   });
 
-  const [selectedUserId, setSelectedUserId] = useState<string>(users[0]?.id || '');
-  const selectedUser = users.find(u => u.id === selectedUserId);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  
+  // Set first user as selected when profiles load
+  useEffect(() => {
+    if (profiles.length > 0 && !selectedUserId) {
+      setSelectedUserId(profiles[0].id);
+    }
+  }, [profiles, selectedUserId]);
+
+  const selectedUser = profiles.find(u => u.id === selectedUserId);
 
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
@@ -41,6 +57,13 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
     // Convert to Monday-based (0 = Monday, 6 = Sunday)
     return firstDay === 0 ? 6 : firstDay - 1;
   }, [selectedMonth, selectedYear]);
+
+  // Get planned vacation days for the selected user and month
+  const plannedVacations = useMemo(() => {
+    if (!selectedUserId) return [];
+    // Month is 0-indexed in our state but 1-indexed in the database
+    return getVacationDays(selectedUserId, selectedYear, selectedMonth + 1);
+  }, [selectedUserId, selectedYear, selectedMonth, getVacationDays, vacations]);
 
   // Navigate to previous month
   const goToPreviousMonth = () => {
@@ -68,21 +91,63 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
     setSearchParams({ month: newMonth.toString(), year: newYear.toString() });
   };
 
-  const toggleDay = (day: number) => {
+  const toggleDay = async (day: number) => {
     if (!selectedUser) return;
-    const isPlanned = selectedUser.plannedVacations.includes(day);
-    const newPlanned = isPlanned
-      ? selectedUser.plannedVacations.filter(d => d !== day)
-      : [...selectedUser.plannedVacations, day].sort((a, b) => a - b);
     
-    onUpdate({
-      ...selectedUser,
-      plannedVacations: newPlanned,
-      vacationUsed: newPlanned.length,
-      // Status could logically change if they have many days planned
-      status: newPlanned.length > 0 ? 'Férias' : 'Ativo'
-    });
+    setSavingDay(day);
+    setSaveError(null);
+    
+    // Month is 0-indexed in state but 1-indexed in the database
+    const { error } = await toggleVacationDay(selectedUser.id, selectedYear, selectedMonth + 1, day);
+    
+    if (error) {
+      setSaveError(error);
+    }
+    
+    setSavingDay(null);
   };
+
+  const loading = profilesLoading || vacationsLoading;
+  const error = profilesError || vacationsError;
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-slate-500 dark:text-slate-400 font-medium">Carregando planejamento...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] items-center justify-center bg-slate-50 dark:bg-slate-900 p-8">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 max-w-md">
+          <div className="flex items-center gap-3">
+            <span className="material-icons-round text-red-500 text-2xl">error</span>
+            <div>
+              <h3 className="text-lg font-bold text-red-700 dark:text-red-400">Erro ao carregar dados</h3>
+              <p className="text-red-600 dark:text-red-300">{error}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (profiles.length === 0) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-64px)] items-center justify-center bg-slate-50 dark:bg-slate-900 p-8">
+        <div className="text-center">
+          <span className="material-icons-round text-6xl text-slate-300 dark:text-slate-600 mb-4">group_off</span>
+          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Nenhum colaborador cadastrado</h3>
+          <p className="text-slate-500 dark:text-slate-400">Adicione colaboradores primeiro para planejar férias.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-slate-50 dark:bg-slate-900">
@@ -118,13 +183,29 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
         </div>
       </div>
 
+      {/* Save Error */}
+      {saveError && (
+        <div className="mx-4 mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-3">
+            <span className="material-icons-round text-red-500 text-lg">error</span>
+            <p className="text-sm text-red-700 dark:text-red-400 font-medium flex-1">{saveError}</p>
+            <button 
+              onClick={() => setSaveError(null)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <span className="material-icons-round text-lg">close</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-grow flex overflow-hidden">
         {/* User Sidebar */}
         <div className="w-56 bg-white dark:bg-surface-dark border-r border-slate-200 dark:border-slate-800 overflow-y-auto hidden md:block">
           <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
             <h3 className="text-[10px] font-bold text-slate-500 uppercase">Selecione um Colaborador</h3>
           </div>
-          {users.map(u => (
+          {profiles.map(u => (
             <button
               key={u.id}
               onClick={() => setSelectedUserId(u.id)}
@@ -136,7 +217,7 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
                 </div>
                 <div className="truncate">
                   <p className="text-sm font-bold dark:text-white leading-tight">{u.name}</p>
-                  <p className="text-[9px] text-slate-500 uppercase">{u.role}</p>
+                  <p className="text-[9px] text-slate-500 uppercase">{u.role || 'Sem cargo'}</p>
                 </div>
               </div>
             </button>
@@ -160,25 +241,31 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
-                const isSelected = selectedUser?.plannedVacations.includes(day);
+                const isSelected = plannedVacations.includes(day);
                 const dayIdxInWeek = (i + firstDayOffset) % 7;
                 const isWeekend = dayIdxInWeek === 5 || dayIdxInWeek === 6; // Saturday (5) or Sunday (6)
+                const isSaving = savingDay === day;
 
                 return (
                   <button
                     key={day}
                     onClick={() => toggleDay(day)}
-                    className={`h-16 sm:h-20 border-r border-b border-slate-100 dark:border-slate-800 p-1.5 text-left flex flex-col transition-all relative group
+                    disabled={isSaving}
+                    className={`h-16 sm:h-20 border-r border-b border-slate-100 dark:border-slate-800 p-1.5 text-left flex flex-col transition-all relative group disabled:opacity-70
                       ${isWeekend ? 'bg-red-50/30 dark:bg-red-900/10' : ''}
                       ${isSelected ? 'bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
                     `}
                   >
                     <span className={`text-xs font-bold ${isWeekend ? 'text-red-500' : 'dark:text-white'}`}>{day}</span>
-                    {isSelected && (
+                    {isSaving ? (
+                      <div className="mt-auto w-full h-6 bg-slate-200 dark:bg-slate-700 rounded-md flex items-center justify-center animate-pulse">
+                        <div className="h-3 w-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      </div>
+                    ) : isSelected ? (
                       <div className="mt-auto w-full h-6 bg-primary rounded-md shadow-sm flex items-center justify-center animate-in zoom-in duration-200">
                         <span className="material-icons-round text-white text-[11px]">beach_access</span>
                       </div>
-                    )}
+                    ) : null}
                     <div className="absolute inset-0 border-2 border-primary opacity-0 group-active:opacity-100 pointer-events-none rounded-sm transition-opacity" />
                   </button>
                 );
@@ -197,22 +284,23 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Recurso Selecionado</p>
-              <h3 className="text-base font-bold dark:text-white">{selectedUser?.name}</h3>
+              <h3 className="text-base font-bold dark:text-white">{selectedUser?.name || 'Nenhum'}</h3>
             </div>
           </div>
           <div className="flex gap-6">
             <div className="text-center">
-              <p className="text-[10px] text-slate-500 font-medium">Dias Programados</p>
-              <p className="text-xl font-black text-primary">{selectedUser?.plannedVacations.length}</p>
+              <p className="text-[10px] text-slate-500 font-medium">Dias Neste Mês</p>
+              <p className="text-xl font-black text-primary">{plannedVacations.length}</p>
             </div>
             <div className="text-center">
-              <p className="text-[10px] text-slate-500 font-medium">Saldo Restante</p>
-              <p className="text-xl font-black text-slate-900 dark:text-white">{selectedUser?.vacationBalance}</p>
+              <p className="text-[10px] text-slate-500 font-medium">Saldo Total</p>
+              <p className="text-xl font-black text-slate-900 dark:text-white">{selectedUser?.vacation_balance ?? 0}</p>
             </div>
           </div>
-          <button className="bg-primary hover:bg-primary-dark text-white px-5 py-2 rounded-lg font-bold text-sm shadow-lg shadow-primary/20 transition-all">
-            Salvar Alterações
-          </button>
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span className="material-icons-round text-green-500">check_circle</span>
+            <span>Alterações salvas automaticamente</span>
+          </div>
         </div>
       </div>
     </div>
@@ -220,3 +308,4 @@ const Planning: React.FC<PlanningProps> = ({ users, onUpdate }) => {
 };
 
 export default Planning;
+

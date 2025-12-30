@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
-import { INITIAL_USERS } from './constants';
-import { User } from './types';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -15,15 +15,31 @@ import Summary from './pages/Summary';
 const Navbar: React.FC<{ isDarkMode: boolean, toggleTheme: () => void }> = ({ isDarkMode, toggleTheme }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const isActive = (path: string) => location.pathname === path;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsUserMenuOpen(false);
+    await signOut();
     navigate('/auth');
   };
 
   if (location.pathname === '/auth') return null;
+
+  // Get user initials from profile name or email
+  const getInitials = () => {
+    if (profile?.name) {
+      return profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return '??';
+  };
+
+  const displayName = profile?.name || user?.email?.split('@')[0] || 'Usuário';
+  const displayEmail = user?.email || '';
 
   return (
     <nav className="bg-white dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
@@ -73,7 +89,7 @@ const Navbar: React.FC<{ isDarkMode: boolean, toggleTheme: () => void }> = ({ is
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-primary/20 hover:bg-primary-dark transition-colors cursor-pointer"
               >
-                AD
+                {getInitials()}
               </button>
               {isUserMenuOpen && (
                 <>
@@ -83,8 +99,8 @@ const Navbar: React.FC<{ isDarkMode: boolean, toggleTheme: () => void }> = ({ is
                   />
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-2 z-20 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-700">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-white">Admin</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">admin@holidaygo.com</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{displayName}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{displayEmail}</p>
                     </div>
                     <button
                       onClick={handleLogout}
@@ -104,8 +120,7 @@ const Navbar: React.FC<{ isDarkMode: boolean, toggleTheme: () => void }> = ({ is
   );
 };
 
-const App: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+const AppContent: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -118,34 +133,64 @@ const App: React.FC = () => {
 
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
-  const addUser = (user: User) => setUsers([...users, user]);
-  const updateUser = (updatedUser: User) => setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
-  const deleteUser = (id: string) => setUsers(users.filter(u => u.id !== id));
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<Navigate to="/auth" replace />} />
+          <Route path="/auth" element={<Auth />} />
+          
+          {/* Protected Routes */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/summary" element={
+            <ProtectedRoute>
+              <Summary />
+            </ProtectedRoute>
+          } />
+          <Route path="/users" element={
+            <ProtectedRoute>
+              <Users />
+            </ProtectedRoute>
+          } />
+          <Route path="/planning" element={
+            <ProtectedRoute>
+              <Planning />
+            </ProtectedRoute>
+          } />
+          <Route path="/users/add" element={
+            <ProtectedRoute>
+              <UserForm />
+            </ProtectedRoute>
+          } />
+          <Route path="/users/edit/:id" element={
+            <ProtectedRoute>
+              <UserForm />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </main>
+      <footer className="bg-white dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 py-6 px-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <p className="text-slate-400 text-sm">
+            © {new Date().getFullYear()} holidayGo System. Todos os direitos reservados.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+};
 
+const App: React.FC = () => {
   return (
     <HashRouter>
-      <div className="min-h-screen flex flex-col">
-        <Navbar isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Navigate to="/auth" replace />} />
-            <Route path="/dashboard" element={<Dashboard users={users} />} />
-            <Route path="/summary" element={<Summary users={users} />} />
-            <Route path="/users" element={<Users users={users} onDelete={deleteUser} />} />
-            <Route path="/planning" element={<Planning users={users} onUpdate={updateUser} />} />
-            <Route path="/users/add" element={<UserForm onSave={addUser} />} />
-            <Route path="/users/edit/:id" element={<UserForm users={users} onSave={updateUser} />} />
-            <Route path="/auth" element={<Auth />} />
-          </Routes>
-        </main>
-        <footer className="bg-white dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 py-6 px-4">
-          <div className="max-w-7xl mx-auto text-center">
-            <p className="text-slate-400 text-sm">
-              © {new Date().getFullYear()} holidayGo System. Todos os direitos reservados.
-            </p>
-          </div>
-        </footer>
-      </div>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </HashRouter>
   );
 };
