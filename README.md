@@ -11,7 +11,7 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Google AI](https://img.shields.io/badge/Google_AI-Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 
-[Documentação Completa](docs/) • [Guia do Usuário](docs/USER_GUIDE.md) • [Arquitetura](docs/ARCHITECTURE.md)
+[Arquitetura](docs/ARCHITECTURE.md) • [Desenvolvimento](docs/DEVELOPMENT.md) • [Componentes](docs/COMPONENTS.md) • [API](docs/API.md) • [Guia do Usuário](docs/USER_GUIDE.md)
 
 </div>
 
@@ -381,6 +381,18 @@ server: {
 ### Problema: Módulos não encontrados
 
 **Solução**: Execute `npm install` novamente
+
+## 📚 Documentação
+
+Documentação completa disponível na pasta `docs/`:
+
+| Documento | Descrição |
+|-----------|-----------|
+| [📐 ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema, diagramas e fluxos de dados |
+| [💻 DEVELOPMENT.md](docs/DEVELOPMENT.md) | Guia de desenvolvimento e configuração do ambiente |
+| [🧩 COMPONENTS.md](docs/COMPONENTS.md) | Documentação detalhada de todos os componentes |
+| [📖 API.md](docs/API.md) | Referência de tipos TypeScript e serviços |
+| [📘 USER_GUIDE.md](docs/USER_GUIDE.md) | Manual de uso da aplicação para usuários finais |
 
 ## 🤝 Contribuindo
 
