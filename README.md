@@ -2,7 +2,6 @@
 
 <div align="center">
 
-![holidayGo Banner](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
 
 **Sistema inteligente para gerenciamento de férias de colaboradores**
 
