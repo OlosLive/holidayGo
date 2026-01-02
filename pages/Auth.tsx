@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabaseClient';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { signIn, signUp, user, loading: authLoading, initialized, error: authError } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -15,14 +16,50 @@ const Auth: React.FC = () => {
   // Form fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
 
-  // Redirect if already logged in
+  // Check sessionStorage for recovery tokens stored by App.tsx
   useEffect(() => {
-    if (initialized && user) {
+    const storedType = sessionStorage.getItem('supabase_recovery_type');
+    const storedAccessToken = sessionStorage.getItem('supabase_recovery_access_token');
+    
+    if (storedType === 'recovery' && storedAccessToken) {
+      setMode('reset');
+      
+      // Set the session with the stored tokens
+      const storedRefreshToken = sessionStorage.getItem('supabase_recovery_refresh_token');
+      if (storedRefreshToken) {
+        supabase.auth.setSession({
+          access_token: storedAccessToken,
+          refresh_token: storedRefreshToken
+        }).then(() => {
+          // Clear stored tokens after setting session
+          sessionStorage.removeItem('supabase_recovery_type');
+          sessionStorage.removeItem('supabase_recovery_access_token');
+          sessionStorage.removeItem('supabase_recovery_refresh_token');
+        });
+      }
+    }
+  }, [location.search]);
+
+  // Listen for PASSWORD_RECOVERY event from Supabase
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setMode('reset');
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Redirect if already logged in (but not in reset mode)
+  useEffect(() => {
+    if (initialized && user && mode !== 'reset') {
       navigate('/dashboard');
     }
-  }, [user, initialized, navigate]);
+  }, [user, initialized, navigate, mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,8 +86,11 @@ const Auth: React.FC = () => {
           setMode('login');
         }
       } else if (mode === 'forgot') {
+        // Supabase will add tokens as hash fragments to this URL
+        const redirectUrl = window.location.origin;
+        
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth?mode=reset`,
+          redirectTo: redirectUrl,
         });
         
         if (resetError) {
@@ -58,6 +98,25 @@ const Auth: React.FC = () => {
         } else {
           setSuccess('Email de recuperação enviado! Verifique sua caixa de entrada.');
           setEmail('');
+        }
+      } else if (mode === 'reset') {
+        if (password !== confirmPassword) {
+          setError('As senhas não coincidem');
+          setIsLoading(false);
+          return;
+        }
+        
+        const { error: updateError } = await supabase.auth.updateUser({
+          password: password
+        });
+        
+        if (updateError) {
+          setError(translateError(updateError.message));
+        } else {
+          setSuccess('Senha alterada com sucesso! Você será redirecionado...');
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 2000);
         }
       }
     } catch {
@@ -135,6 +194,7 @@ const Auth: React.FC = () => {
       case 'login': return 'Bem-vindo de volta';
       case 'register': return 'Crie sua conta';
       case 'forgot': return 'Recuperar senha';
+      case 'reset': return 'Nova senha';
     }
   };
 
@@ -143,6 +203,7 @@ const Auth: React.FC = () => {
       case 'login': return 'Entre na sua conta para gerenciar os agendamentos da equipe.';
       case 'register': return 'Comece a organizar as férias do seu time de forma inteligente.';
       case 'forgot': return 'Digite seu email e enviaremos um link para redefinir sua senha.';
+      case 'reset': return 'Digite sua nova senha para recuperar o acesso à sua conta.';
     }
   };
 
@@ -151,6 +212,7 @@ const Auth: React.FC = () => {
       case 'login': return 'Acessar Painel';
       case 'register': return 'Criar minha conta';
       case 'forgot': return 'Enviar link de recuperação';
+      case 'reset': return 'Salvar nova senha';
     }
   };
 
@@ -214,24 +276,28 @@ const Auth: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
-              <div className="relative group">
-                <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">alternate_email</span>
-                <input 
-                  type="email" 
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nome@empresa.com"
-                  className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
-                />
+            {mode !== 'reset' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
+                <div className="relative group">
+                  <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">alternate_email</span>
+                  <input 
+                    type="email" 
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nome@empresa.com"
+                    className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {mode !== 'forgot' && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Senha</label>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
+                  {mode === 'reset' ? 'Nova Senha' : 'Senha'}
+                </label>
                 <div className="relative group">
                   <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock</span>
                   <input 
@@ -239,6 +305,24 @@ const Auth: React.FC = () => {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    minLength={6}
+                    className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
+                  />
+                </div>
+              </div>
+            )}
+
+            {mode === 'reset' && (
+              <div className="space-y-1.5 animate-in fade-in zoom-in-95 duration-300">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Confirmar Nova Senha</label>
+                <div className="relative group">
+                  <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock_reset</span>
+                  <input 
+                    type="password" 
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     minLength={6}
                     className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
@@ -278,7 +362,7 @@ const Auth: React.FC = () => {
           </form>
 
           <div className="text-center space-y-4">
-            {mode === 'forgot' ? (
+            {(mode === 'forgot' || mode === 'reset') ? (
               <button 
                 onClick={handleBackToLogin}
                 className="text-primary font-black hover:underline focus:outline-none flex items-center justify-center gap-2 mx-auto"

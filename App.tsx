@@ -12,6 +12,34 @@ import UserForm from './pages/UserForm';
 import Auth from './pages/Auth';
 import Summary from './pages/Summary';
 
+// Capture Supabase recovery tokens BEFORE HashRouter processes URL
+// This runs once on initial page load to handle password recovery redirects
+const captureSupabaseTokens = () => {
+  const fullUrl = window.location.href;
+  const hasTokensInUrl = fullUrl.includes('access_token');
+  const hasTypeRecovery = fullUrl.includes('type=recovery');
+  
+  if (hasTypeRecovery && hasTokensInUrl) {
+    const accessTokenMatch = fullUrl.match(/access_token=([^&]+)/);
+    const refreshTokenMatch = fullUrl.match(/refresh_token=([^&]+)/);
+    // Use specific regex to match &type= or #type= to avoid matching token_type=
+    const typeMatch = fullUrl.match(/[&#]type=([^&]+)/);
+    
+    if (accessTokenMatch && typeMatch && typeMatch[1] === 'recovery') {
+      sessionStorage.setItem('supabase_recovery_type', typeMatch[1]);
+      sessionStorage.setItem('supabase_recovery_access_token', accessTokenMatch[1]);
+      if (refreshTokenMatch) {
+        sessionStorage.setItem('supabase_recovery_refresh_token', refreshTokenMatch[1]);
+      }
+      // Redirect to clean auth URL
+      window.location.href = window.location.origin + '/#/auth?recovery=true';
+    }
+  }
+};
+
+// Execute immediately before React renders
+captureSupabaseTokens();
+
 const Navbar: React.FC<{ isDarkMode: boolean, toggleTheme: () => void }> = ({ isDarkMode, toggleTheme }) => {
   const location = useLocation();
   const navigate = useNavigate();
