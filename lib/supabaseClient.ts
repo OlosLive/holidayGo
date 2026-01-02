@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../types/database';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -8,7 +8,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('❌ Supabase não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no .env.local');
 }
 
-export const supabase = createClient<Database>(
+// Typed client for read operations
+export const supabase: SupabaseClient<Database> = createClient<Database>(
+  supabaseUrl || '',
+  supabaseAnonKey || '',
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  }
+);
+
+// Untyped client for write operations (avoids strict type checking issues)
+export const supabaseWrite = createClient(
   supabaseUrl || '',
   supabaseAnonKey || '',
   {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, supabaseWrite } from '../lib/supabaseClient';
 import type { Profile } from '../types/database';
 
 interface AuthState {
@@ -176,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: new Error('No user logged in') };
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseWrite
       .from('profiles')
       .update(updates)
       .eq('id', state.user.id);
