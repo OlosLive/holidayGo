@@ -6,6 +6,7 @@ Este documento descreve a arquitetura técnica, padrões de design e fluxos de d
 
 - [Visão Geral](#visão-geral)
 - [Arquitetura de Componentes](#arquitetura-de-componentes)
+- [Repository Pattern e Camada de Dados](#repository-pattern-e-camada-de-dados)
 - [Integração com Supabase](#integração-com-supabase)
 - [Fluxo de Dados](#fluxo-de-dados)
 - [Gerenciamento de Estado](#gerenciamento-de-estado)
@@ -146,6 +147,112 @@ holidayGo/
 ├── geminiService.ts       # Serviço de IA
 └── vite.config.ts         # Configuração build
 ```
+
+---
+
+## Repository Pattern e Camada de Dados
+
+O holidayGo implementa o **Repository Pattern** para abstrair a fonte de dados. Isso permite alternar entre dados mockados (localStorage) e Supabase sem modificar a lógica de negócio.
+
+### Arquitetura da Camada de Dados
+
+```mermaid
+graph TB
+    subgraph UI[Interface do Usuário]
+        Dashboard[Dashboard]
+        Planning[Planning]
+        Summary[Summary]
+    end
+    
+    subgraph Hooks[Custom Hooks]
+        useProfiles[useProfiles]
+        useVacations[useVacations]
+    end
+    
+    subgraph Factory[Repository Factory]
+        getProfileRepo[getProfileRepository]
+        getVacationRepo[getVacationRepository]
+    end
+    
+    subgraph Config[Configuração]
+        useMockData{VITE_USE_MOCK_DATA}
+    end
+    
+    subgraph Repositories[Repositórios]
+        subgraph Mock[Mock - localStorage]
+            MockProfile[MockProfileRepository]
+            MockVacation[MockVacationRepository]
+        end
+        subgraph Supabase[Supabase - Cloud]
+            SupaProfile[SupabaseProfileRepository]
+            SupaVacation[SupabaseVacationRepository]
+        end
+    end
+    
+    Dashboard --> useProfiles
+    Planning --> useProfiles
+    Planning --> useVacations
+    Summary --> useProfiles
+    Summary --> useVacations
+    
+    useProfiles --> getProfileRepo
+    useVacations --> getVacationRepo
+    
+    getProfileRepo --> useMockData
+    getVacationRepo --> useMockData
+    
+    useMockData -->|true| MockProfile
+    useMockData -->|true| MockVacation
+    useMockData -->|false| SupaProfile
+    useMockData -->|false| SupaVacation
+    
+    style useMockData fill:#ffd700
+    style Mock fill:#90EE90
+    style Supabase fill:#3ECF8E
+```
+
+### Interfaces dos Repositórios
+
+```typescript
+// lib/repositories/interfaces.ts
+export interface IProfileRepository {
+  fetchProfiles(): Promise<{ data: Profile[] | null; error: string | null }>;
+  getProfile(id: string): Promise<{ data: Profile | null; error: string | null }>;
+  createProfile(profile: ProfileInsert): Promise<{ data: Profile | null; error: string | null }>;
+  updateProfile(id: string, updates: ProfileUpdate): Promise<{ error: string | null }>;
+  deleteProfile(id: string): Promise<{ error: string | null }>;
+}
+
+export interface IVacationRepository {
+  fetchAllVacations(): Promise<{ data: Vacation[] | null; error: string | null }>;
+  getVacationDays(userId: string, year: number, month: number): number[];
+  toggleVacationDay(userId: string, year: number, month: number, day: number): Promise<{ error: string | null }>;
+  // ...
+}
+```
+
+### Fluxo de Decisão
+
+```mermaid
+flowchart TD
+    Start[Hook solicita dados] --> Check{config.useMockData?}
+    Check -->|true| Mock[MockRepository]
+    Check -->|false| Supa[SupabaseRepository]
+    Mock --> LocalStorage[(localStorage)]
+    Supa --> Cloud[(Supabase Cloud)]
+    LocalStorage --> Return[Retorna dados]
+    Cloud --> Return
+```
+
+### Benefícios
+
+| Benefício | Descrição |
+|-----------|-----------|
+| **Desenvolvimento Offline** | Funciona sem conexão ao Supabase |
+| **Testes Isolados** | Mock não afeta dados reais |
+| **Prototipagem Rápida** | Dados fictícios pré-configurados |
+| **Demonstrações** | Ambiente controlado para apresentações |
+| **Inversão de Dependência** | Hooks não dependem de implementação específica |
 
 ---
 
@@ -557,7 +664,27 @@ graph TD
 
 ## Padrões de Design
 
-### 1. Container/Presentational Pattern
+### 1. Repository Pattern
+
+Abstrai a fonte de dados, permitindo alternar entre implementações:
+
+```typescript
+// Interface define contrato
+interface IProfileRepository {
+  fetchProfiles(): Promise<{ data: Profile[] | null; error: string | null }>;
+}
+
+// Implementações diferentes
+class MockProfileRepository implements IProfileRepository { ... }
+class SupabaseProfileRepository implements IProfileRepository { ... }
+
+// Factory decide qual usar
+const repository = config.useMockData 
+  ? new MockProfileRepository() 
+  : new SupabaseProfileRepository();
+```
+
+### 2. Container/Presentational Pattern
 
 **Container (Smart Component)**
 - Gerencia estado e lógica
@@ -568,7 +695,7 @@ graph TD
 - Apenas renderiza UI
 - Exemplo: `StatusBadge`, `Navbar`, `Footer`
 
-### 2. Custom Hooks Pattern
+### 3. Custom Hooks Pattern
 
 Encapsula lógica de dados em hooks reutilizáveis:
 
@@ -582,7 +709,7 @@ if (error) return <Error message={error} />;
 return <ProfileList profiles={profiles} />;
 ```
 
-### 3. Context + Hooks Pattern
+### 4. Context + Hooks Pattern
 
 ```typescript
 // Contexto provê estado global
@@ -596,7 +723,7 @@ export const useAuth = () => {
 };
 ```
 
-### 4. Optimistic Updates
+### 5. Optimistic Updates
 
 ```typescript
 const toggleVacationDay = async (userId, year, month, day) => {
@@ -657,15 +784,19 @@ O código atual está preparado para evoluir:
 2. ✅ **Custom Hooks** - Isolam lógica de dados
 3. ✅ **Backend Real** - Supabase integrado
 4. ✅ **Autenticação Real** - Supabase Auth implementado
-5. ⏳ **Testes** - Jest, React Testing Library
-6. ⏳ **CI/CD** - GitHub Actions
+5. ✅ **Repository Pattern** - Abstração de fonte de dados
+6. ✅ **Modo Mock** - Desenvolvimento offline com localStorage
+7. ⏳ **Testes** - Jest, React Testing Library
+8. ⏳ **CI/CD** - GitHub Actions
 
 ### Pontos de Extensão
 
-- Serviços isolados facilitam mocking
+- **Repository Pattern** permite trocar fonte de dados facilmente
+- Serviços isolados facilitam mocking e testes
 - Tipos TypeScript centralizados
 - Componentes desacoplados
 - Real-time pronto para colaboração multi-usuário
+- Modo mock para demonstrações e prototipagem
 
 ---
 

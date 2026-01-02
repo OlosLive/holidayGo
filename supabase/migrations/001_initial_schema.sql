@@ -185,3 +185,5 @@ CREATE TRIGGER update_vacation_count
   FOR EACH ROW
   EXECUTE FUNCTION update_vacation_used();
 
+
+

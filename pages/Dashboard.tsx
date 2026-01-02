@@ -434,87 +434,74 @@ const Dashboard: React.FC = () => {
         </>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
-            <div className="p-4 bg-primary/10 rounded-2xl text-primary">
-              <span className="material-icons-round text-3xl">beach_access</span>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Média de Férias/Mês</p>
-              <h4 className="text-2xl font-black dark:text-white">{stats.avgVacations} dias</h4>
-            </div>
+      {/* Stats Cards - Three in a row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
+          <div className="p-4 bg-primary/10 rounded-2xl text-primary">
+            <span className="material-icons-round text-3xl">beach_access</span>
           </div>
-          <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
-            <div className="p-4 bg-red-100 rounded-2xl text-red-500">
-              <span className="material-icons-round text-3xl">event_busy</span>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Pico de Ausência</p>
-              <h4 className="text-2xl font-black dark:text-white">
-                {stats.peakMonth.total > 0 ? `${stats.peakMonth.month} / ${selectedYear}` : 'Sem dados'}
-              </h4>
-            </div>
-          </div>
-
-          <div className="md:col-span-2 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/10 dark:to-blue-900/10 p-7 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-black flex items-center gap-2 dark:text-white font-display">
-                <span className="material-icons-round text-blue-500">auto_awesome</span>
-                Análise de Disponibilidade
-              </h3>
-              <button 
-                onClick={handleGetAiSummary}
-                disabled={isLoadingSummary || profiles.length === 0}
-                className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 font-black shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoadingSummary ? 'Processando...' : 'Pedir Resumo IA'}
-              </button>
-            </div>
-            {aiSummary ? (
-              <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line animate-in fade-in duration-500">
-                {aiSummary}
-              </p>
-            ) : (
-              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-                {profiles.length === 0 
-                  ? 'Adicione colaboradores para usar a análise de IA.'
-                  : `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para ${selectedYear}.`
-                }
-              </p>
-            )}
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Média de Férias/Mês</p>
+            <h4 className="text-2xl font-black dark:text-white">{stats.avgVacations} dias</h4>
           </div>
         </div>
-
-        <div className="bg-white dark:bg-surface-dark p-7 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h3 className="text-lg font-black mb-6 dark:text-white font-display uppercase tracking-widest text-xs opacity-50">Legenda</h3>
-          <ul className="space-y-5">
-            <li className="flex items-center gap-4">
-              <div className="w-5 h-5 bg-primary rounded-lg shadow-sm"></div>
-              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Férias Confirmadas</span>
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
+          <div className="p-4 bg-red-100 rounded-2xl text-red-500">
+            <span className="material-icons-round text-3xl">event_busy</span>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Pico de Ausência</p>
+            <h4 className="text-2xl font-black dark:text-white">
+              {stats.peakMonth.total > 0 ? `${stats.peakMonth.month} / ${selectedYear}` : 'Sem dados'}
+            </h4>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Legenda</p>
+          <ul className="space-y-2">
+            <li className="flex items-center gap-3">
+              <div className="w-4 h-4 bg-primary rounded-md shadow-sm"></div>
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Férias Confirmadas</span>
             </li>
-            <li className="flex items-center gap-4">
-              <div className="w-5 h-5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"></div>
-              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Finais de Semana</span>
+            <li className="flex items-center gap-3">
+              <div className="w-4 h-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"></div>
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Finais de Semana</span>
             </li>
-            <li className="flex items-center gap-4">
-              <div className="w-5 h-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"></div>
-              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Disponibilidade Total</span>
+            <li className="flex items-center gap-3">
+              <div className="w-4 h-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md"></div>
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Disponibilidade Total</span>
             </li>
           </ul>
-          
-          <div className="mt-10 pt-8 border-t border-slate-100 dark:border-slate-800">
-            <p className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-tighter">Exportar Relatórios</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" title="Exportar PDF">
-                <span className="material-icons-round text-slate-400">picture_as_pdf</span>
-              </button>
-              <button className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" title="Exportar Excel">
-                <span className="material-icons-round text-slate-400">table_chart</span>
-              </button>
-            </div>
-          </div>
         </div>
+      </div>
+
+      {/* AI Analysis - Full Width */}
+      <div className="mt-6 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/10 dark:to-blue-900/10 p-7 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-black flex items-center gap-2 dark:text-white font-display">
+            <span className="material-icons-round text-blue-500">auto_awesome</span>
+            Análise de Disponibilidade
+          </h3>
+          <button 
+            onClick={handleGetAiSummary}
+            disabled={isLoadingSummary || profiles.length === 0}
+            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 font-black shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingSummary ? 'Processando...' : 'Pedir Resumo IA'}
+          </button>
+        </div>
+        {aiSummary ? (
+          <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line animate-in fade-in duration-500">
+            {aiSummary}
+          </p>
+        ) : (
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+            {profiles.length === 0 
+              ? 'Adicione colaboradores para usar a análise de IA.'
+              : `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para ${selectedYear}.`
+            }
+          </p>
+        )}
       </div>
     </div>
   );

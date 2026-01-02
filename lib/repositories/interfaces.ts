@@ -79,3 +79,5 @@ export interface IVacationRepository {
   subscribe?(callback: (event: 'INSERT' | 'UPDATE' | 'DELETE', vacation: Vacation) => void): () => void;
 }
 
+
+

@@ -82,11 +82,33 @@ Crie um arquivo `.env.local` na raiz do projeto:
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua_chave_anon_aqui
 
-# Google Gemini AI
+# Google Gemini AI (opcional)
 GEMINI_API_KEY=sua_chave_api_gemini
+
+# Modo Mock (opcional - para desenvolvimento sem Supabase)
+VITE_USE_MOCK_DATA=false
 ```
 
 > ⚠️ **Importante**: As variáveis do Supabase devem começar com `VITE_` para serem expostas ao frontend.
+
+### Modo de Dados Mockados
+
+O sistema possui um **modo mock** que permite desenvolvimento e testes sem necessidade de conexão com o Supabase. Este modo utiliza `localStorage` para persistir dados localmente.
+
+**Para ativar o modo mock**, adicione ao `.env.local`:
+
+```env
+VITE_USE_MOCK_DATA=true
+```
+
+**Características do modo mock:**
+- 🔐 **Autenticação real** - O login/registro continua usando Supabase Auth
+- 👥 **Dados de perfis mockados** - 10 colaboradores pré-configurados
+- 📅 **Férias mockadas** - Dados de exemplo para visualização
+- 💾 **Persistência local** - Dados salvos no `localStorage` do navegador
+- 🔄 **Reset fácil** - Limpe o `localStorage` para reiniciar os dados
+
+> 💡 **Dica**: Use o modo mock para demonstrações, prototipagem ou quando não tiver acesso ao Supabase.
 
 5. **Execute a aplicação**
 
@@ -116,7 +138,18 @@ holidayGo/
 │   ├── useProfiles.ts        # CRUD de colaboradores
 │   └── useVacations.ts       # Gestão de férias
 ├── lib/
-│   └── supabaseClient.ts     # Cliente Supabase configurado
+│   ├── supabaseClient.ts     # Cliente Supabase configurado
+│   ├── config.ts             # Configurações da aplicação (mock mode)
+│   └── repositories/         # Camada de abstração de dados
+│       ├── interfaces.ts     # Interfaces dos repositórios
+│       ├── index.ts          # Factory para repositórios
+│       ├── mock/             # Implementação com dados mockados
+│       │   ├── mockData.ts   # Dados de exemplo
+│       │   ├── MockProfileRepository.ts
+│       │   └── MockVacationRepository.ts
+│       └── supabase/         # Implementação com Supabase
+│           ├── SupabaseProfileRepository.ts
+│           └── SupabaseVacationRepository.ts
 ├── pages/
 │   ├── Auth.tsx              # Página de login/registro
 │   ├── Dashboard.tsx         # Dashboard principal
@@ -327,13 +360,23 @@ O sistema utiliza o **Google Gemini AI** para gerar resumos executivos inteligen
 ### Variáveis de Ambiente
 
 ```env
-# Supabase (obrigatório)
+# Supabase (obrigatório para autenticação)
 VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...sua_chave_anon
 
 # Google Gemini AI (opcional, para resumos IA)
 GEMINI_API_KEY=AIza...sua_chave_api
+
+# Modo Mock (opcional - desabilita Supabase para dados)
+VITE_USE_MOCK_DATA=true  # true = mock, false = Supabase
 ```
+
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `VITE_SUPABASE_URL` | ✅ | URL do projeto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | ✅ | Chave anônima do Supabase |
+| `GEMINI_API_KEY` | ❌ | Chave API do Google Gemini |
+| `VITE_USE_MOCK_DATA` | ❌ | `true` para modo mock, `false` para Supabase |
 
 ### Portas e Host
 

@@ -32,3 +32,5 @@ INSERT INTO vacations (user_id, vacation_date, year, month, day, status) VALUES
   ('replace-with-actual-uuid-1', '2026-07-09', 2026, 7, 9, 'planned');
 */
 
+
+

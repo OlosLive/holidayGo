@@ -6,7 +6,9 @@ Este guia fornece instruções detalhadas para desenvolvedores que desejam contr
 
 - [Configuração do Ambiente](#configuração-do-ambiente)
 - [Configuração do Supabase](#configuração-do-supabase)
+- [Modo Mock (Dados Fictícios)](#modo-mock-dados-fictícios)
 - [Estrutura do Código](#estrutura-do-código)
+- [Repository Pattern](#repository-pattern)
 - [Guia de Estilo](#guia-de-estilo)
 - [Trabalhando com Hooks](#trabalhando-com-hooks)
 - [Adicionando Funcionalidades](#adicionando-funcionalidades)
@@ -134,6 +136,53 @@ curl "https://seu-projeto.supabase.co/rest/v1/profiles" \
 
 ---
 
+## Modo Mock (Dados Fictícios)
+
+O sistema suporta um **modo de dados mockados** para desenvolvimento e testes sem dependência do Supabase.
+
+### Ativando o Modo Mock
+
+Adicione ao `.env.local`:
+
+```env
+VITE_USE_MOCK_DATA=true
+```
+
+### Como Funciona
+
+| Funcionalidade | Modo Mock | Modo Supabase |
+|---------------|-----------|---------------|
+| **Autenticação** | ✅ Supabase Auth (real) | ✅ Supabase Auth |
+| **Perfis** | 📦 localStorage | ☁️ Supabase DB |
+| **Férias** | 📦 localStorage | ☁️ Supabase DB |
+| **Persistência** | 💾 Browser local | 💾 Cloud |
+
+### Dados Mock Disponíveis
+
+O sistema inclui 10 colaboradores mockados com dados realistas:
+
+```typescript
+// lib/repositories/mock/mockData.ts
+const profiles = [
+  { name: 'Ana Silva', role: 'Desenvolvedora Frontend', vacation_balance: 25 },
+  { name: 'Bruno Costa', role: 'Desenvolvedor Backend', vacation_balance: 18 },
+  // ... mais 8 colaboradores
+];
+```
+
+### Resetando Dados Mock
+
+Para limpar os dados e voltar ao estado inicial:
+
+```javascript
+// No console do navegador
+localStorage.removeItem('holidaygo_mock_profiles');
+localStorage.removeItem('holidaygo_mock_vacations');
+location.reload();
+```
+
+---
+
 ## Estrutura do Código
 
 ### Diretórios e Arquivos
@@ -142,7 +191,18 @@ curl "https://seu-projeto.supabase.co/rest/v1/profiles" \
 holidayGo/
 │
 ├── lib/                       # Bibliotecas e clientes
-│   └── supabaseClient.ts      # Cliente Supabase configurado
+│   ├── supabaseClient.ts      # Cliente Supabase configurado
+│   ├── config.ts              # Configurações (useMockData)
+│   └── repositories/          # Camada de abstração de dados
+│       ├── interfaces.ts      # IProfileRepository, IVacationRepository
+│       ├── index.ts           # Factory (getProfileRepository, etc)
+│       ├── mock/              # Implementação mock
+│       │   ├── mockData.ts    # Dados iniciais
+│       │   ├── MockProfileRepository.ts
+│       │   └── MockVacationRepository.ts
+│       └── supabase/          # Implementação Supabase
+│           ├── SupabaseProfileRepository.ts
+│           └── SupabaseVacationRepository.ts
 │
 ├── contexts/                  # Contextos React
 │   └── AuthContext.tsx        # Contexto de autenticação
@@ -186,12 +246,108 @@ holidayGo/
 | Arquivo | Responsabilidade |
 |---------|------------------|
 | `lib/supabaseClient.ts` | Instância do cliente Supabase |
+| `lib/config.ts` | Configurações da aplicação |
+| `lib/repositories/*` | Camada de abstração de dados |
 | `contexts/AuthContext.tsx` | Gerencia estado de autenticação |
-| `hooks/useProfiles.ts` | CRUD de colaboradores + realtime |
-| `hooks/useVacations.ts` | Gestão de férias + realtime |
+| `hooks/useProfiles.ts` | CRUD de colaboradores (via repository) |
+| `hooks/useVacations.ts` | Gestão de férias (via repository) |
 | `components/ProtectedRoute.tsx` | Protege rotas autenticadas |
 | `pages/*.tsx` | Componentes de página |
 | `types/database.ts` | Tipos TypeScript do banco |
+
+---
+
+## Repository Pattern
+
+O sistema utiliza o **Repository Pattern** para abstrair a fonte de dados. Isso permite alternar entre dados mockados e Supabase sem modificar a lógica dos hooks.
+
+### Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Hooks                                 │
+│   useProfiles.ts          useVacations.ts                   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Repository Factory                         │
+│   getProfileRepository()    getVacationRepository()         │
+│                     (lib/repositories/index.ts)             │
+└─────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┴───────────────────┐
+          ▼                                       ▼
+┌─────────────────────┐               ┌─────────────────────┐
+│   Mock Repository   │               │ Supabase Repository │
+│   (localStorage)    │               │  (Supabase Cloud)   │
+└─────────────────────┘               └─────────────────────┘
+```
+
+### Interfaces
+
+```typescript
+// lib/repositories/interfaces.ts
+export interface IProfileRepository {
+  fetchProfiles(): Promise<{ data: Profile[] | null; error: string | null }>;
+  getProfile(id: string): Promise<{ data: Profile | null; error: string | null }>;
+  createProfile(profile: ProfileInsert): Promise<{ data: Profile | null; error: string | null }>;
+  updateProfile(id: string, updates: ProfileUpdate): Promise<{ error: string | null }>;
+  deleteProfile(id: string): Promise<{ error: string | null }>;
+}
+
+export interface IVacationRepository {
+  fetchAllVacations(): Promise<{ data: Vacation[] | null; error: string | null }>;
+  getVacationDays(userId: string, year: number, month: number): number[];
+  toggleVacationDay(userId: string, year: number, month: number, day: number): Promise<{ error: string | null }>;
+  addVacationDays(userId: string, year: number, month: number, days: number[]): Promise<{ error: string | null }>;
+  removeVacationDays(userId: string, year: number, month: number, days: number[]): Promise<{ error: string | null }>;
+}
+```
+
+### Factory
+
+```typescript
+// lib/repositories/index.ts
+import { config } from '../config';
+
+export const getProfileRepository = (): IProfileRepository => {
+  if (config.useMockData) {
+    return new MockProfileRepository();
+  }
+  return new SupabaseProfileRepository();
+};
+
+export const getVacationRepository = (): IVacationRepository => {
+  if (config.useMockData) {
+    return new MockVacationRepository();
+  }
+  return new SupabaseVacationRepository();
+};
+```
+
+### Uso nos Hooks
+
+```typescript
+// hooks/useProfiles.ts
+import { getProfileRepository } from '../lib/repositories';
+
+export const useProfiles = () => {
+  const repository = getProfileRepository();
+  
+  const fetchProfiles = async () => {
+    const { data, error } = await repository.fetchProfiles();
+    // ...
+  };
+};
+```
+
+### Adicionando Novo Repository
+
+1. **Crie a interface** em `lib/repositories/interfaces.ts`
+2. **Implemente Mock** em `lib/repositories/mock/`
+3. **Implemente Supabase** em `lib/repositories/supabase/`
+4. **Adicione factory** em `lib/repositories/index.ts`
 
 ---
 
@@ -506,22 +662,44 @@ export const useReports = () => {
 ### Arquivo `.env.local`
 
 ```env
-# Supabase (obrigatório)
+# Supabase (obrigatório para autenticação)
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 
 # Google Gemini AI (opcional)
 GEMINI_API_KEY=AIzaSy...
+
+# Modo Mock - dados fictícios (opcional)
+VITE_USE_MOCK_DATA=true
 ```
+
+### Tabela de Variáveis
+
+| Variável | Obrigatória | Padrão | Descrição |
+|----------|-------------|--------|-----------|
+| `VITE_SUPABASE_URL` | ✅ | - | URL do projeto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | ✅ | - | Chave anônima pública |
+| `GEMINI_API_KEY` | ❌ | - | API key do Google Gemini |
+| `VITE_USE_MOCK_DATA` | ❌ | `false` | `true` = localStorage, `false` = Supabase |
 
 ### Acessando no Código
 
 ```typescript
 // Variáveis VITE_* estão disponíveis via import.meta.env
 const url = import.meta.env.VITE_SUPABASE_URL;
+const useMock = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
 // Variáveis sem VITE_ são processadas pelo vite.config.ts
 const apiKey = process.env.API_KEY; // Injetada no build
+```
+
+### Configuração Centralizada
+
+```typescript
+// lib/config.ts
+export const config = {
+  useMockData: import.meta.env.VITE_USE_MOCK_DATA === 'true',
+};
 ```
 
 ### Segurança

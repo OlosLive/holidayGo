@@ -4,6 +4,10 @@ import type { Profile, Vacation } from '../../../types/database';
  * Initial mock profiles
  * These are loaded when localStorage is empty
  */
+/**
+ * Initial mock profiles
+ * vacation_balance = 30 (direito anual) - vacation_used
+ */
 export const initialMockProfiles: Profile[] = [
   {
     id: 'mock-user-1',
@@ -14,7 +18,7 @@ export const initialMockProfiles: Profile[] = [
     hire_date: '2021-03-15',
     status: 'active',
     avatar_url: null,
-    vacation_balance: 30,
+    vacation_balance: 25,  // 30 - 5 = 25 restantes
     vacation_used: 5,
     created_at: '2021-03-15T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
@@ -28,7 +32,7 @@ export const initialMockProfiles: Profile[] = [
     hire_date: '2020-06-01',
     status: 'active',
     avatar_url: null,
-    vacation_balance: 30,
+    vacation_balance: 20,  // 30 - 10 = 20 restantes
     vacation_used: 10,
     created_at: '2020-06-01T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
@@ -42,7 +46,7 @@ export const initialMockProfiles: Profile[] = [
     hire_date: '2022-01-10',
     status: 'active',
     avatar_url: null,
-    vacation_balance: 30,
+    vacation_balance: 30,  // 30 - 0 = 30 restantes
     vacation_used: 0,
     created_at: '2022-01-10T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
@@ -56,7 +60,7 @@ export const initialMockProfiles: Profile[] = [
     hire_date: '2023-02-20',
     status: 'active',
     avatar_url: null,
-    vacation_balance: 30,
+    vacation_balance: 15,  // 30 - 15 = 15 restantes
     vacation_used: 15,
     created_at: '2023-02-20T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
@@ -70,7 +74,7 @@ export const initialMockProfiles: Profile[] = [
     hire_date: '2021-09-05',
     status: 'active',
     avatar_url: null,
-    vacation_balance: 30,
+    vacation_balance: 10,  // 30 - 20 = 10 restantes
     vacation_used: 20,
     created_at: '2021-09-05T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
@@ -84,9 +88,38 @@ export const initialMockProfiles: Profile[] = [
     hire_date: '2019-11-12',
     status: 'inactive',
     avatar_url: null,
-    vacation_balance: 30,
+    vacation_balance: 0,   // 30 - 30 = 0 restantes
     vacation_used: 30,
     created_at: '2019-11-12T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z',
+  },
+  // Usuários com saldo CRÍTICO (≥45 dias acumulados - risco de vencimento)
+  {
+    id: 'mock-user-7',
+    name: 'Gustavo Mendes',
+    email: 'gustavo.mendes@empresa.com',
+    role: 'Arquiteto de Software',
+    department: 'Tecnologia',
+    hire_date: '2018-03-01',
+    status: 'active',
+    avatar_url: null,
+    vacation_balance: 52,  // Acumulou 2 anos sem tirar férias completas
+    vacation_used: 8,
+    created_at: '2018-03-01T10:00:00Z',
+    updated_at: '2024-01-01T10:00:00Z',
+  },
+  {
+    id: 'mock-user-8',
+    name: 'Helena Barbosa',
+    email: 'helena.barbosa@empresa.com',
+    role: 'Gerente de Projetos',
+    department: 'PMO',
+    hire_date: '2017-08-15',
+    status: 'active',
+    avatar_url: null,
+    vacation_balance: 48,  // Próximo de perder dias
+    vacation_used: 12,
+    created_at: '2017-08-15T10:00:00Z',
     updated_at: '2024-01-01T10:00:00Z',
   },
 ];

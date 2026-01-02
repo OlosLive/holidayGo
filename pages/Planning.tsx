@@ -30,14 +30,19 @@ const Planning: React.FC = () => {
     return year ? parseInt(year) : new Date().getFullYear();
   });
 
-  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [selectedUserId, setSelectedUserId] = useState<string>(() => {
+    return searchParams.get('userId') || '';
+  });
   
-  // Set first user as selected when profiles load
+  // Set user from URL param or first user when profiles load
   useEffect(() => {
-    if (profiles.length > 0 && !selectedUserId) {
+    const userIdFromUrl = searchParams.get('userId');
+    if (userIdFromUrl && profiles.some(p => p.id === userIdFromUrl)) {
+      setSelectedUserId(userIdFromUrl);
+    } else if (profiles.length > 0 && !selectedUserId) {
       setSelectedUserId(profiles[0].id);
     }
-  }, [profiles, selectedUserId]);
+  }, [profiles, searchParams]);
 
   const selectedUser = profiles.find(u => u.id === selectedUserId);
 

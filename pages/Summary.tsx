@@ -60,10 +60,10 @@ const Summary: React.FC = () => {
   };
 
   // Computed data
-  const { usersWithoutVacation, usersWithUpcomingVacation, avgBalance, criticalAlerts, totalBalance } = useMemo(() => {
+  const { usersWithoutVacation, usersWithUpcomingVacation, usersWithCriticalBalance, avgBalance, criticalAlerts, totalBalance } = useMemo(() => {
     const withoutVacation = profiles.filter(p => {
       const upcomingDays = getUpcomingVacationDays(p.id);
-      return upcomingDays === 0 && p.status !== 'Inativo';
+      return upcomingDays === 0 && p.status !== 'Inativo' && p.status !== 'inactive';
     });
 
     const withUpcoming = profiles.filter(p => {
@@ -75,16 +75,22 @@ const Summary: React.FC = () => {
       nextVacation: getNextVacationInfo(p.id)
     }));
 
+    // Users with critical balance (≥45 days) - risk of losing vacation days
+    const withCriticalBalance = profiles
+      .filter(p => p.vacation_balance >= 45 && p.status !== 'inactive')
+      .sort((a, b) => b.vacation_balance - a.vacation_balance); // Sort by highest balance first
+
     const avg = profiles.length > 0 
       ? Math.round(profiles.reduce((acc, p) => acc + p.vacation_balance, 0) / profiles.length)
       : 0;
 
-    const critical = profiles.filter(p => p.vacation_balance >= 45).length;
+    const critical = withCriticalBalance.length;
     const total = profiles.reduce((acc, p) => acc + p.vacation_balance, 0);
 
     return {
       usersWithoutVacation: withoutVacation,
       usersWithUpcomingVacation: withUpcoming,
+      usersWithCriticalBalance: withCriticalBalance,
       avgBalance: avg,
       criticalAlerts: critical,
       totalBalance: total
@@ -140,12 +146,34 @@ const Summary: React.FC = () => {
             {avgBalance} dias
           </h3>
         </div>
-        <div className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Alertas de Vencimento</p>
-          <h3 className="text-2xl font-black text-red-500">
+        <button 
+          onClick={() => {
+            const section = document.getElementById('alertas-vencimento');
+            if (section) section.scrollIntoView({ behavior: 'smooth' });
+          }}
+          disabled={criticalAlerts === 0}
+          className={`bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border text-left w-full transition-all ${
+            criticalAlerts > 0 
+              ? 'border-red-200 dark:border-red-800/50 hover:shadow-md hover:border-red-300 cursor-pointer' 
+              : 'border-slate-200 dark:border-slate-800 cursor-default'
+          }`}
+        >
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+            Alertas de Vencimento
+            {criticalAlerts > 0 && (
+              <span className="material-icons-round text-red-500 text-xs animate-pulse">notification_important</span>
+            )}
+          </p>
+          <h3 className={`text-2xl font-black ${criticalAlerts > 0 ? 'text-red-500' : 'text-green-500'}`}>
             {criticalAlerts}
           </h3>
-        </div>
+          {criticalAlerts > 0 && (
+            <p className="text-[9px] text-red-500 mt-1 flex items-center gap-1">
+              <span className="material-icons-round text-xs">arrow_downward</span>
+              Clique para ver detalhes
+            </p>
+          )}
+        </button>
         <div className="bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total Acumulado</p>
           <h3 className="text-2xl font-black text-slate-900 dark:text-white">
@@ -169,66 +197,202 @@ const Summary: React.FC = () => {
         </div>
       ) : (
         <>
-          {/* Dynamic Alert Sections */}
+          {/* Alert Tables - Side by Side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* No Vacation Scheduled */}
-            <section>
-              <div className="flex items-center gap-2 mb-3">
+            {/* Sem Férias Marcadas - Table */}
+            <div className="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-yellow-200 dark:border-yellow-800/50 overflow-hidden">
+              <div className="px-4 py-3 border-b border-yellow-100 dark:border-yellow-800/30 bg-yellow-50 dark:bg-yellow-900/20 flex items-center gap-2">
                 <span className="material-icons-round text-yellow-500 text-lg">warning_amber</span>
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Sem Férias Marcadas</h3>
+                <h3 className="text-sm font-black text-yellow-700 dark:text-yellow-400">Sem Férias Marcadas</h3>
+                <span className="ml-auto text-xs font-bold text-yellow-600 dark:text-yellow-500">{usersWithoutVacation.length}</span>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-3 custom-scrollbar">
-                {usersWithoutVacation.length > 0 ? (
-                  usersWithoutVacation.map(profile => (
-                    <div key={profile.id} className="min-w-[160px] bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 p-3 rounded-lg shadow-sm flex flex-col items-center text-center">
-                      <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-sm mb-2">
-                        {profile.name.charAt(0)}
-                      </div>
-                      <h4 className="text-sm font-bold dark:text-white truncate w-full leading-tight">{profile.name}</h4>
-                      <p className="text-[9px] text-slate-500 uppercase font-medium mt-0.5">Saldo: {profile.vacation_balance} dias</p>
-                      <Link 
-                        to="/planning"
-                        className="mt-2 text-[9px] font-black uppercase text-primary hover:text-primary-dark transition-colors"
-                      >
-                        Agendar Agora
-                      </Link>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400 italic">Todos os colaboradores ativos têm agendamentos.</p>
-                )}
-              </div>
-            </section>
+              {usersWithoutVacation.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                    <thead className="bg-slate-50 dark:bg-slate-900/50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Colaborador</th>
+                        <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Utilizados</th>
+                        <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {usersWithoutVacation.map((profile) => (
+                        <tr key={profile.id} className="hover:bg-yellow-50/50 dark:hover:bg-yellow-900/10 transition-colors">
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-yellow-100 to-yellow-50 dark:from-yellow-900/30 dark:to-yellow-800/20 flex items-center justify-center text-yellow-600 dark:text-yellow-400 font-bold text-xs">
+                                {profile.name.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold dark:text-white leading-tight">{profile.name}</div>
+                                <div className="text-[10px] text-slate-500">{profile.role || 'Sem cargo'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold dark:text-slate-300">
+                            {profile.vacation_used}d
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">
+                            <Link 
+                              to={`/planning?userId=${profile.id}`}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold text-primary hover:text-primary-dark transition-colors"
+                            >
+                              <span className="material-icons-round text-sm">event</span>
+                              Agendar
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-6 text-center">
+                  <span className="material-icons-round text-3xl text-green-400 mb-2">check_circle</span>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Todos têm férias agendadas.</p>
+                </div>
+              )}
+            </div>
 
-            {/* Upcoming Vacations */}
-            <section>
-              <div className="flex items-center gap-2 mb-3">
+            {/* Férias se Aproximando - Table */}
+            <div className="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-primary/30 dark:border-primary/20 overflow-hidden">
+              <div className="px-4 py-3 border-b border-primary/20 dark:border-primary/10 bg-primary/5 dark:bg-primary/10 flex items-center gap-2">
                 <span className="material-icons-round text-primary text-lg">beach_access</span>
-                <h3 className="text-xs font-black uppercase tracking-widest text-slate-700 dark:text-slate-300">Férias se Aproximando</h3>
+                <h3 className="text-sm font-black text-primary">Férias se Aproximando</h3>
+                <span className="ml-auto text-xs font-bold text-primary/70">{usersWithUpcomingVacation.length}</span>
               </div>
-              <div className="flex gap-3 overflow-x-auto pb-3 custom-scrollbar">
-                {usersWithUpcomingVacation.length > 0 ? (
-                  usersWithUpcomingVacation.map(profile => (
-                    <div key={profile.id} className="min-w-[160px] bg-primary/5 dark:bg-primary/10 border border-primary/20 dark:border-primary/30 p-3 rounded-lg shadow-sm flex flex-col items-center text-center">
-                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm mb-2">
-                        {profile.name.charAt(0)}
-                      </div>
-                      <h4 className="text-sm font-bold dark:text-white truncate w-full leading-tight">{profile.name}</h4>
-                      <p className="text-[9px] text-primary uppercase font-black mt-0.5">
-                        {profile.nextVacation 
-                          ? `${profile.nextVacation.days} dias em ${profile.nextVacation.month}`
-                          : `${profile.upcomingDays} dias`
-                        }
-                      </p>
-                      <div className="mt-1.5 px-2 py-0.5 bg-primary text-white text-[8px] font-bold rounded uppercase">Confirmado</div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-slate-400 italic">Nenhuma saída programada para este período.</p>
-                )}
-              </div>
-            </section>
+              {usersWithUpcomingVacation.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                    <thead className="bg-slate-50 dark:bg-slate-900/50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Colaborador</th>
+                        <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Utilizados</th>
+                        <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Próximas Férias</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {usersWithUpcomingVacation.map((profile) => (
+                        <tr key={profile.id} className="hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors">
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-bold text-xs">
+                                {profile.name.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold dark:text-white leading-tight">{profile.name}</div>
+                                <div className="text-[10px] text-slate-500">{profile.role || 'Sem cargo'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center text-sm font-semibold dark:text-slate-300">
+                            {profile.vacation_used}d
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-primary text-white text-[10px] font-bold rounded">
+                              <span className="material-icons-round text-xs">event_available</span>
+                              {profile.nextVacation 
+                                ? `${profile.nextVacation.days}d em ${profile.nextVacation.month}`
+                                : `${profile.upcomingDays} dias`
+                              }
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-6 text-center">
+                  <span className="material-icons-round text-3xl text-slate-300 dark:text-slate-600 mb-2">event_busy</span>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma saída programada.</p>
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Alertas de Vencimento - Critical Users Table */}
+          {usersWithCriticalBalance.length > 0 && (
+            <div id="alertas-vencimento" className="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-red-200 dark:border-red-800/50 overflow-hidden scroll-mt-4">
+              <div className="px-4 py-3 border-b border-red-100 dark:border-red-800/30 bg-red-50 dark:bg-red-900/20 flex items-center gap-2">
+                <span className="material-icons-round text-red-500 text-lg animate-pulse">notification_important</span>
+                <h3 className="text-sm font-black text-red-700 dark:text-red-400">Alertas de Vencimento</h3>
+                <span className="ml-auto text-xs font-bold text-red-600 dark:text-red-500">{usersWithCriticalBalance.length} colaborador(es) em risco</span>
+              </div>
+              <div className="p-3 bg-red-50/50 dark:bg-red-900/10 border-b border-red-100 dark:border-red-800/20">
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  <span className="material-icons-round text-xs align-middle mr-1">info</span>
+                  Colaboradores com mais de 45 dias acumulados estão em risco de perder dias de férias. Ação recomendada: agendar férias imediatamente.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                  <thead className="bg-slate-50 dark:bg-slate-900/50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Colaborador</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Saldo Acumulado</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Dias em Risco</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Urgência</th>
+                      <th className="px-3 py-2 text-center text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {usersWithCriticalBalance.map((profile) => {
+                      const daysAtRisk = profile.vacation_balance - 30; // Dias acima do limite anual
+                      const urgency = profile.vacation_balance >= 55 ? 'CRÍTICO' : profile.vacation_balance >= 50 ? 'ALTO' : 'MÉDIO';
+                      const urgencyColor = profile.vacation_balance >= 55 
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+                        : profile.vacation_balance >= 50 
+                          ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' 
+                          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+                      
+                      return (
+                        <tr key={profile.id} className="hover:bg-red-50/50 dark:hover:bg-red-900/10 transition-colors">
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20 flex items-center justify-center text-red-600 dark:text-red-400 font-bold text-xs">
+                                {profile.name.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold dark:text-white leading-tight">{profile.name}</div>
+                                <div className="text-[10px] text-slate-500">{profile.role || 'Sem cargo'}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">
+                            <span className="text-lg font-black text-red-600 dark:text-red-400">
+                              {profile.vacation_balance}d
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-xs font-bold rounded">
+                              <span className="material-icons-round text-xs">trending_up</span>
+                              +{daysAtRisk}d excedente
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">
+                            <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-full ${urgencyColor}`}>
+                              {urgency}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">
+                            <Link 
+                              to={`/planning?userId=${profile.id}`}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold rounded transition-colors"
+                            >
+                              <span className="material-icons-round text-sm">event</span>
+                              Agendar Agora
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Main Table */}
           <div className="bg-white dark:bg-surface-dark rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
