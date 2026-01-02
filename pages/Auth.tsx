@@ -2,13 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabaseClient';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
   const { signIn, signUp, user, loading: authLoading, initialized, error: authError } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
   // Form fields
   const [email, setEmail] = useState('');
@@ -26,6 +28,7 @@ const Auth: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       if (mode === 'login') {
@@ -36,7 +39,7 @@ const Auth: React.FC = () => {
         } else {
           navigate('/dashboard');
         }
-      } else {
+      } else if (mode === 'register') {
         const { error: signUpError } = await signUp(email, password, name);
         if (signUpError) {
           setError(translateError(signUpError.message));
@@ -44,6 +47,17 @@ const Auth: React.FC = () => {
           setError(null);
           alert('Conta criada com sucesso! Verifique seu email para confirmar o cadastro.');
           setMode('login');
+        }
+      } else if (mode === 'forgot') {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth?mode=reset`,
+        });
+        
+        if (resetError) {
+          setError(translateError(resetError.message));
+        } else {
+          setSuccess('Email de recuperação enviado! Verifique sua caixa de entrada.');
+          setEmail('');
         }
       }
     } catch {
@@ -60,6 +74,8 @@ const Auth: React.FC = () => {
       'User already registered': 'Este email já está cadastrado',
       'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres',
       'Unable to validate email address: invalid format': 'Formato de email inválido',
+      'For security purposes, you can only request this once every 60 seconds': 'Por segurança, aguarde 60 segundos antes de solicitar novamente',
+      'Email rate limit exceeded': 'Limite de emails excedido. Tente novamente mais tarde.',
     };
     return errorMap[message] || message;
   };
@@ -67,6 +83,19 @@ const Auth: React.FC = () => {
   const toggleMode = () => {
     setMode(prev => prev === 'login' ? 'register' : 'login');
     setError(null);
+    setSuccess(null);
+  };
+
+  const handleForgotPassword = () => {
+    setMode('forgot');
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handleBackToLogin = () => {
+    setMode('login');
+    setError(null);
+    setSuccess(null);
   };
 
   // Show loading while checking auth state (with timeout message)
@@ -101,6 +130,30 @@ const Auth: React.FC = () => {
     );
   }
 
+  const getTitle = () => {
+    switch (mode) {
+      case 'login': return 'Bem-vindo de volta';
+      case 'register': return 'Crie sua conta';
+      case 'forgot': return 'Recuperar senha';
+    }
+  };
+
+  const getSubtitle = () => {
+    switch (mode) {
+      case 'login': return 'Entre na sua conta para gerenciar os agendamentos da equipe.';
+      case 'register': return 'Comece a organizar as férias do seu time de forma inteligente.';
+      case 'forgot': return 'Digite seu email e enviaremos um link para redefinir sua senha.';
+    }
+  };
+
+  const getButtonText = () => {
+    switch (mode) {
+      case 'login': return 'Acessar Painel';
+      case 'register': return 'Criar minha conta';
+      case 'forgot': return 'Enviar link de recuperação';
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white dark:bg-slate-950">
       {/* Left side: Authentication Forms */}
@@ -116,12 +169,10 @@ const Auth: React.FC = () => {
           
           <div className="space-y-2">
             <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              {mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
+              {getTitle()}
             </h2>
             <p className="text-slate-500 dark:text-slate-400 font-medium">
-              {mode === 'login' 
-                ? 'Entre na sua conta para gerenciar os agendamentos da equipe.' 
-                : 'Comece a organizar as férias do seu time de forma inteligente.'}
+              {getSubtitle()}
             </p>
           </div>
 
@@ -131,6 +182,16 @@ const Auth: React.FC = () => {
               <div className="flex items-center gap-3">
                 <span className="material-icons-round text-red-500">error</span>
                 <p className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {success && (
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-3">
+                <span className="material-icons-round text-green-500">check_circle</span>
+                <p className="text-sm text-green-700 dark:text-green-400 font-medium">{success}</p>
               </div>
             </div>
           )}
@@ -168,25 +229,33 @@ const Auth: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Senha</label>
-              <div className="relative group">
-                <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock</span>
-                <input 
-                  type="password" 
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  minLength={6}
-                  className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
-                />
+            {mode !== 'forgot' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Senha</label>
+                <div className="relative group">
+                  <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock</span>
+                  <input 
+                    type="password" 
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    minLength={6}
+                    className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {mode === 'login' && (
               <div className="flex justify-end">
-                <button type="button" className="text-xs font-bold text-slate-500 hover:text-primary transition-colors">Esqueceu a senha?</button>
+                <button 
+                  type="button" 
+                  onClick={handleForgotPassword}
+                  className="text-xs font-bold text-slate-500 hover:text-primary transition-colors"
+                >
+                  Esqueceu a senha?
+                </button>
               </div>
             )}
 
@@ -199,28 +268,42 @@ const Auth: React.FC = () => {
                 <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>{mode === 'login' ? 'Acessar Painel' : 'Criar minha conta'}</span>
-                  <span className="material-icons-round group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                  <span>{getButtonText()}</span>
+                  <span className="material-icons-round group-hover:translate-x-1 transition-transform">
+                    {mode === 'forgot' ? 'mail' : 'arrow_forward'}
+                  </span>
                 </>
               )}
             </button>
           </form>
 
           <div className="text-center space-y-4">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-900"></div></div>
-              <div className="relative flex justify-center text-xs uppercase font-black text-slate-400 bg-white dark:bg-slate-950 px-2 tracking-widest">ou</div>
-            </div>
-
-            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-              {mode === 'login' ? 'Não tem uma conta ainda?' : 'Já possui uma conta?'}
+            {mode === 'forgot' ? (
               <button 
-                onClick={toggleMode}
-                className="text-primary font-black ml-2 hover:underline focus:outline-none"
+                onClick={handleBackToLogin}
+                className="text-primary font-black hover:underline focus:outline-none flex items-center justify-center gap-2 mx-auto"
               >
-                {mode === 'login' ? 'Cadastre-se grátis' : 'Fazer login'}
+                <span className="material-icons-round text-sm">arrow_back</span>
+                Voltar para o login
               </button>
-            </p>
+            ) : (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-900"></div></div>
+                  <div className="relative flex justify-center text-xs uppercase font-black text-slate-400 bg-white dark:bg-slate-950 px-2 tracking-widest">ou</div>
+                </div>
+
+                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                  {mode === 'login' ? 'Não tem uma conta ainda?' : 'Já possui uma conta?'}
+                  <button 
+                    onClick={toggleMode}
+                    className="text-primary font-black ml-2 hover:underline focus:outline-none"
+                  >
+                    {mode === 'login' ? 'Cadastre-se grátis' : 'Fazer login'}
+                  </button>
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
