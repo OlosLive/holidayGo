@@ -401,18 +401,6 @@ const Auth: React.FC = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-900/40 to-primary/20"></div>
         
-        {/* Floating card elements for visual interest */}
-        <div className="absolute top-16 right-12 p-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl animate-bounce duration-[3000ms] hidden xl:block">
-           <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-green-400/20 flex items-center justify-center">
-                <span className="material-icons-round text-green-400 text-lg">check_circle</span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-[11px] uppercase tracking-tighter">Férias Aprovadas</p>
-                <p className="text-white/60 text-[10px]">Aline Ribeiro • 15 dias</p>
-              </div>
-           </div>
-        </div>
 
         <div className="relative z-10 flex flex-col justify-center p-12 lg:p-16 text-white w-full h-full">
           <div className="max-w-xl space-y-5">
