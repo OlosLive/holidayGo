@@ -1,219 +1,24 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { supabase } from '../lib/supabaseClient';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { signIn, signUp, user, loading: authLoading, initialized, error: authError } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  
-  // Form fields
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
 
-  // Check sessionStorage for recovery tokens stored by App.tsx
-  useEffect(() => {
-    const storedType = sessionStorage.getItem('supabase_recovery_type');
-    const storedAccessToken = sessionStorage.getItem('supabase_recovery_access_token');
-    
-    if (storedType === 'recovery' && storedAccessToken) {
-      setMode('reset');
-      
-      // Set the session with the stored tokens
-      const storedRefreshToken = sessionStorage.getItem('supabase_recovery_refresh_token');
-      if (storedRefreshToken) {
-        supabase.auth.setSession({
-          access_token: storedAccessToken,
-          refresh_token: storedRefreshToken
-        }).then(() => {
-          // Clear stored tokens after setting session
-          sessionStorage.removeItem('supabase_recovery_type');
-          sessionStorage.removeItem('supabase_recovery_access_token');
-          sessionStorage.removeItem('supabase_recovery_refresh_token');
-        });
-      }
-    }
-  }, [location.search]);
-
-  // Listen for PASSWORD_RECOVERY event from Supabase
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setMode('reset');
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Redirect if already logged in (but not in reset mode)
-  useEffect(() => {
-    if (initialized && user && mode !== 'reset') {
-      navigate('/dashboard');
-    }
-  }, [user, initialized, navigate, mode]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      if (mode === 'login') {
-        const { error: signInError } = await signIn(email, password);
-        
-        if (signInError) {
-          setError(translateError(signInError.message));
-        } else {
-          navigate('/dashboard');
-        }
-      } else if (mode === 'register') {
-        const { error: signUpError } = await signUp(email, password, name);
-        if (signUpError) {
-          setError(translateError(signUpError.message));
-        } else {
-          setError(null);
-          alert('Conta criada com sucesso! Verifique seu email para confirmar o cadastro.');
-          setMode('login');
-        }
-      } else if (mode === 'forgot') {
-        // Supabase will add tokens as hash fragments to this URL
-        const redirectUrl = window.location.origin;
-        
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectUrl,
-        });
-        
-        if (resetError) {
-          setError(translateError(resetError.message));
-        } else {
-          setSuccess('Email de recuperação enviado! Verifique sua caixa de entrada.');
-          setEmail('');
-        }
-      } else if (mode === 'reset') {
-        if (password !== confirmPassword) {
-          setError('As senhas não coincidem');
-          setIsLoading(false);
-          return;
-        }
-        
-        const { error: updateError } = await supabase.auth.updateUser({
-          password: password
-        });
-        
-        if (updateError) {
-          setError(translateError(updateError.message));
-        } else {
-          setSuccess('Senha alterada com sucesso! Você será redirecionado...');
-          setTimeout(() => {
-            navigate('/dashboard');
-          }, 2000);
-        }
-      }
-    } catch {
-      setError('Ocorreu um erro inesperado. Tente novamente.');
-    } finally {
+    // Simulate a network request
+    setTimeout(() => {
       setIsLoading(false);
-    }
-  };
-
-  const translateError = (message: string): string => {
-    const errorMap: Record<string, string> = {
-      'Invalid login credentials': 'Email ou senha incorretos',
-      'Email not confirmed': 'Email não confirmado. Verifique sua caixa de entrada.',
-      'User already registered': 'Este email já está cadastrado',
-      'Password should be at least 6 characters': 'A senha deve ter pelo menos 6 caracteres',
-      'Unable to validate email address: invalid format': 'Formato de email inválido',
-      'For security purposes, you can only request this once every 60 seconds': 'Por segurança, aguarde 60 segundos antes de solicitar novamente',
-      'Email rate limit exceeded': 'Limite de emails excedido. Tente novamente mais tarde.',
-    };
-    return errorMap[message] || message;
+      navigate('/dashboard');
+    }, 800);
   };
 
   const toggleMode = () => {
     setMode(prev => prev === 'login' ? 'register' : 'login');
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleForgotPassword = () => {
-    setMode('forgot');
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleBackToLogin = () => {
-    setMode('login');
-    setError(null);
-    setSuccess(null);
-  };
-
-  // Show loading while checking auth state (with timeout message)
-  if (!initialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-4 max-w-md px-4">
-          {authError ? (
-            <>
-              <span className="material-icons-round text-yellow-500 text-4xl">warning</span>
-              <p className="text-slate-700 dark:text-slate-300 font-medium text-center">
-                Não foi possível conectar ao servidor de autenticação.
-              </p>
-              <p className="text-slate-500 dark:text-slate-400 text-sm text-center">
-                {authError}
-              </p>
-              <button
-                onClick={() => window.location.reload()}
-                className="mt-4 px-6 py-2 bg-primary text-white rounded-lg font-bold"
-              >
-                Tentar novamente
-              </button>
-            </>
-          ) : (
-            <>
-              <div className="h-10 w-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-              <p className="text-slate-500 dark:text-slate-400 font-medium">Carregando...</p>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  const getTitle = () => {
-    switch (mode) {
-      case 'login': return 'Bem-vindo de volta';
-      case 'register': return 'Crie sua conta';
-      case 'forgot': return 'Recuperar senha';
-      case 'reset': return 'Nova senha';
-    }
-  };
-
-  const getSubtitle = () => {
-    switch (mode) {
-      case 'login': return 'Entre na sua conta para gerenciar os agendamentos da equipe.';
-      case 'register': return 'Comece a organizar as férias do seu time de forma inteligente.';
-      case 'forgot': return 'Digite seu email e enviaremos um link para redefinir sua senha.';
-      case 'reset': return 'Digite sua nova senha para recuperar o acesso à sua conta.';
-    }
-  };
-
-  const getButtonText = () => {
-    switch (mode) {
-      case 'login': return 'Acessar Painel';
-      case 'register': return 'Criar minha conta';
-      case 'forgot': return 'Enviar link de recuperação';
-      case 'reset': return 'Salvar nova senha';
-    }
   };
 
   return (
@@ -231,32 +36,14 @@ const Auth: React.FC = () => {
           
           <div className="space-y-2">
             <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-              {getTitle()}
+              {mode === 'login' ? 'Bem-vindo de volta' : 'Crie sua conta'}
             </h2>
             <p className="text-slate-500 dark:text-slate-400 font-medium">
-              {getSubtitle()}
+              {mode === 'login' 
+                ? 'Entre na sua conta para gerenciar os agendamentos da equipe.' 
+                : 'Comece a organizar as férias do seu time de forma inteligente.'}
             </p>
           </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-3">
-                <span className="material-icons-round text-red-500">error</span>
-                <p className="text-sm text-red-700 dark:text-red-400 font-medium">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Success Message */}
-          {success && (
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-3">
-                <span className="material-icons-round text-green-500">check_circle</span>
-                <p className="text-sm text-green-700 dark:text-green-400 font-medium">{success}</p>
-              </div>
-            </div>
-          )}
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             {mode === 'register' && (
@@ -267,8 +54,6 @@ const Auth: React.FC = () => {
                   <input 
                     type="text" 
                     required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome"
                     className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
                   />
@@ -276,70 +61,37 @@ const Auth: React.FC = () => {
               </div>
             )}
 
-            {mode !== 'reset' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
-                <div className="relative group">
-                  <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">alternate_email</span>
-                  <input 
-                    type="email" 
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nome@empresa.com"
-                    className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
-                  />
-                </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">E-mail Corporativo</label>
+              <div className="relative group">
+                <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">alternate_email</span>
+                <input 
+                  type="email" 
+                  required
+                  defaultValue={mode === 'login' ? "admin@holidaygo.com" : ""}
+                  placeholder="nome@empresa.com"
+                  className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
+                />
               </div>
-            )}
+            </div>
 
-            {mode !== 'forgot' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">
-                  {mode === 'reset' ? 'Nova Senha' : 'Senha'}
-                </label>
-                <div className="relative group">
-                  <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock</span>
-                  <input 
-                    type="password" 
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    minLength={6}
-                    className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
-                  />
-                </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Senha</label>
+              <div className="relative group">
+                <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock</span>
+                <input 
+                  type="password" 
+                  required
+                  defaultValue={mode === 'login' ? "password" : ""}
+                  placeholder="••••••••"
+                  className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
+                />
               </div>
-            )}
-
-            {mode === 'reset' && (
-              <div className="space-y-1.5 animate-in fade-in zoom-in-95 duration-300">
-                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Confirmar Nova Senha</label>
-                <div className="relative group">
-                  <span className="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors">lock_reset</span>
-                  <input 
-                    type="password" 
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    minLength={6}
-                    className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
-                  />
-                </div>
-              </div>
-            )}
+            </div>
 
             {mode === 'login' && (
               <div className="flex justify-end">
-                <button 
-                  type="button" 
-                  onClick={handleForgotPassword}
-                  className="text-xs font-bold text-slate-500 hover:text-primary transition-colors"
-                >
-                  Esqueceu a senha?
-                </button>
+                <button type="button" className="text-xs font-bold text-slate-500 hover:text-primary transition-colors">Esqueceu a senha?</button>
               </div>
             )}
 
@@ -352,42 +104,28 @@ const Auth: React.FC = () => {
                 <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>{getButtonText()}</span>
-                  <span className="material-icons-round group-hover:translate-x-1 transition-transform">
-                    {mode === 'forgot' ? 'mail' : 'arrow_forward'}
-                  </span>
+                  <span>{mode === 'login' ? 'Acessar Painel' : 'Criar minha conta'}</span>
+                  <span className="material-icons-round group-hover:translate-x-1 transition-transform">arrow_forward</span>
                 </>
               )}
             </button>
           </form>
 
           <div className="text-center space-y-4">
-            {(mode === 'forgot' || mode === 'reset') ? (
-              <button 
-                onClick={handleBackToLogin}
-                className="text-primary font-black hover:underline focus:outline-none flex items-center justify-center gap-2 mx-auto"
-              >
-                <span className="material-icons-round text-sm">arrow_back</span>
-                Voltar para o login
-              </button>
-            ) : (
-              <>
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-900"></div></div>
-                  <div className="relative flex justify-center text-xs uppercase font-black text-slate-400 bg-white dark:bg-slate-950 px-2 tracking-widest">ou</div>
-                </div>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100 dark:border-slate-900"></div></div>
+              <div className="relative flex justify-center text-xs uppercase font-black text-slate-400 bg-white dark:bg-slate-950 px-2 tracking-widest">ou</div>
+            </div>
 
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-                  {mode === 'login' ? 'Não tem uma conta ainda?' : 'Já possui uma conta?'}
-                  <button 
-                    onClick={toggleMode}
-                    className="text-primary font-black ml-2 hover:underline focus:outline-none"
-                  >
-                    {mode === 'login' ? 'Cadastre-se grátis' : 'Fazer login'}
-                  </button>
-                </p>
-              </>
-            )}
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+              {mode === 'login' ? 'Não tem uma conta ainda?' : 'Já possui uma conta?'}
+              <button 
+                onClick={toggleMode}
+                className="text-primary font-black ml-2 hover:underline focus:outline-none"
+              >
+                {mode === 'login' ? 'Cadastre-se grátis' : 'Fazer login'}
+              </button>
+            </p>
           </div>
         </div>
       </div>
@@ -401,6 +139,18 @@ const Auth: React.FC = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-900/40 to-primary/20"></div>
         
+        {/* Floating card elements for visual interest */}
+        <div className="absolute top-16 right-12 p-4 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl animate-bounce duration-[3000ms] hidden xl:block">
+           <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-green-400/20 flex items-center justify-center">
+                <span className="material-icons-round text-green-400 text-lg">check_circle</span>
+              </div>
+              <div>
+                <p className="text-white font-bold text-[11px] uppercase tracking-tighter">Férias Aprovadas</p>
+                <p className="text-white/60 text-[10px]">Aline Ribeiro • 15 dias</p>
+              </div>
+           </div>
+        </div>
 
         <div className="relative z-10 flex flex-col justify-center p-12 lg:p-16 text-white w-full h-full">
           <div className="max-w-xl space-y-5">
