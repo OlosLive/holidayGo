@@ -82,7 +82,26 @@ const Dashboard: React.FC = () => {
     
     // Convert profiles to the format expected by geminiService
     const usersForAI = profiles.map(profile => {
-      const currentMonthVacations = getVacationDaysForMonth(profile.id, selectedYear, selectedMonth);
+      let plannedVacations: number[] = [];
+      
+      if (viewMode === 'mensal') {
+        // Modo mensal: apenas o mês selecionado
+        plannedVacations = getVacationDaysForMonth(profile.id, selectedYear, selectedMonth);
+      } else {
+        // Modo anual: todos os meses do ano
+        // Coletar todos os dias de férias do ano, organizados por mês
+        // Usar formato: mês*1000 + dia para facilitar decodificação
+        const annualVacations: { month: number; days: number[] }[] = [];
+        for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
+          const monthDays = getVacationDaysForMonth(profile.id, selectedYear, monthIdx);
+          if (monthDays.length > 0) {
+            annualVacations.push({ month: monthIdx, days: monthDays });
+          }
+        }
+        // Converter para formato codificado: mês*1000 + dia (permite até 999 dias por mês)
+        plannedVacations = annualVacations.flatMap(m => m.days.map(d => (m.month + 1) * 1000 + d));
+      }
+      
       return {
         id: profile.id,
         name: profile.name,
@@ -93,11 +112,16 @@ const Dashboard: React.FC = () => {
         status: profile.status as 'Ativo' | 'Inativo' | 'Férias' | 'Pendente',
         vacationBalance: profile.vacation_balance,
         vacationUsed: profile.vacation_used,
-        plannedVacations: currentMonthVacations,
+        plannedVacations: plannedVacations,
       };
     });
     
-    const summary = await generateTeamSummary(usersForAI);
+    const summary = await generateTeamSummary(
+      usersForAI, 
+      viewMode, 
+      viewMode === 'mensal' ? selectedMonth : undefined, 
+      selectedYear
+    );
     setAiSummary(summary);
     setIsLoadingSummary(false);
   };
@@ -498,7 +522,9 @@ const Dashboard: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
             {profiles.length === 0 
               ? 'Adicione colaboradores para usar a análise de IA.'
-              : `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para ${selectedYear}.`
+              : viewMode === 'mensal'
+              ? `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para ${months[selectedMonth]} de ${selectedYear}.`
+              : `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para o ano de ${selectedYear}, identificando períodos críticos e distribuição de férias.`
             }
           </p>
         )}
