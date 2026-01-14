@@ -16,6 +16,8 @@ interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  updatePassword: (newPassword: string) => Promise<{ error: AuthError | null }>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
 }
 
@@ -27,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile: null,
     session: null,
     loading: false,
-    initialized: true,
+    initialized: false,
     error: null,
   });
   
@@ -53,6 +55,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // Verificar sessão inicial ao carregar a aplicação
+  useEffect(() => {
+    let mounted = true;
+    
+    setState(prev => ({ ...prev, initialized: false, loading: true }));
+    
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
+      if (session?.user) {
+        setState(prev => ({
+          ...prev,
+          user: session.user,
+          session: session,
+          initialized: true,
+          loading: false,
+        }));
+        
+        fetchProfile(session.user.id).then(profile => {
+          if (mounted) {
+            setState(prev => ({ ...prev, profile }));
+          }
+        });
+      } else {
+        setState(prev => ({
+          ...prev,
+          user: null,
+          profile: null,
+          session: null,
+          initialized: true,
+          loading: false,
+        }));
+      }
+    }).catch(() => {
+      if (mounted) {
+        setState(prev => ({
+          ...prev,
+          initialized: true,
+          loading: false,
+        }));
+      }
+    });
+    
+    return () => {
+      mounted = false;
+    };
+  }, [fetchProfile]);
+
+  // Escutar mudanças de autenticação
   useEffect(() => {
     let mounted = true;
 
@@ -171,6 +222,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
+  const resetPassword = useCallback(async (email: string): Promise<{ error: AuthError | null }> => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/#/auth?recovery=true`,
+      });
+      setState((prev) => ({ ...prev, loading: false }));
+      return { error };
+    } catch (err) {
+      setState((prev) => ({ ...prev, loading: false }));
+      return { error: err as AuthError };
+    }
+  }, []);
+
+  const updatePassword = useCallback(async (newPassword: string): Promise<{ error: AuthError | null }> => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      setState((prev) => ({ ...prev, loading: false }));
+      return { error };
+    } catch (err) {
+      setState((prev) => ({ ...prev, loading: false }));
+      return { error: err as AuthError };
+    }
+  }, []);
+
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
     if (!state.user) {
       return { error: new Error('No user logged in') };
@@ -194,6 +273,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signUp,
     signOut,
+    resetPassword,
+    updatePassword,
     updateProfile,
   };
 
