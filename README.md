@@ -251,7 +251,17 @@ O banco implementa políticas de segurança a nível de linha:
 import { useAuth } from './contexts/AuthContext';
 
 function MyComponent() {
-  const { user, signIn, signOut, loading } = useAuth();
+  const { 
+    user, 
+    profile,
+    signIn, 
+    signUp,
+    signOut, 
+    resetPassword,
+    updatePassword,
+    loading,
+    initialized 
+  } = useAuth();
 
   const handleLogin = async () => {
     const { error } = await signIn('email@example.com', 'password');
@@ -260,10 +270,33 @@ function MyComponent() {
     }
   };
 
+  const handleResetPassword = async (email: string) => {
+    const { error } = await resetPassword(email);
+    if (error) {
+      console.error('Reset failed:', error.message);
+    } else {
+      console.log('Email de recuperação enviado!');
+    }
+  };
+
+  const handleUpdatePassword = async (newPassword: string) => {
+    const { error } = await updatePassword(newPassword);
+    if (error) {
+      console.error('Update failed:', error.message);
+    }
+  };
+
+  if (!initialized) {
+    return <div>Verificando autenticação...</div>;
+  }
+
   return (
     <div>
       {user ? (
-        <button onClick={signOut}>Logout</button>
+        <>
+          <p>Bem-vindo, {profile?.name || user.email}!</p>
+          <button onClick={signOut}>Logout</button>
+        </>
       ) : (
         <button onClick={handleLogin}>Login</button>
       )}
@@ -309,7 +342,9 @@ const {
 - Indicadores visuais de férias confirmadas
 - Destaque de finais de semana
 - Estatísticas de média mensal e picos de ausência
-- Botão para gerar resumo com IA
+- **Análise de Disponibilidade com IA** - Respeita filtros de visualização (mensal/anual)
+  - Modo mensal: analisa apenas o mês selecionado
+  - Modo anual: analisa todo o ano com identificação de períodos críticos
 - Exportação de relatórios (PDF/Excel)
 
 ### Planejamento
@@ -341,6 +376,8 @@ const {
 ### Autenticação
 - **Login com Supabase Auth**
 - **Registro de novos usuários**
+- **Recuperação de senha** - Envio de email e redefinição via link
+- **Verificação de sessão inicial** - Mantém usuário logado ao recarregar
 - Design split-screen moderno
 - Animações suaves
 - Validação de formulários
@@ -348,9 +385,20 @@ const {
 
 ## 🤖 Integração com IA
 
-O sistema utiliza o **Google Gemini AI** para gerar resumos executivos inteligentes sobre a disponibilidade da equipe. A IA analisa:
+O sistema utiliza o **Google Gemini AI** para gerar resumos executivos inteligentes sobre a disponibilidade da equipe. A análise **respeita os filtros de visualização** selecionados:
 
-- Status de férias de todos os colaboradores
+- **Modo Mensal**: Analisa apenas o mês selecionado
+  - Dias específicos de férias
+  - Riscos de sobrecarga no período mensal
+  - Recomendações operacionais
+
+- **Modo Anual**: Analisa todo o ano selecionado
+  - Distribuição de férias ao longo dos 12 meses
+  - Períodos críticos com alta concentração de ausências
+  - Recomendações estratégicas para distribuição equilibrada
+
+A IA analisa:
+- Status de férias de todos os colaboradores no período selecionado
 - Quantidade de ausências programadas
 - Riscos de sobrecarga operacional
 - Recomendações para gestores de RH

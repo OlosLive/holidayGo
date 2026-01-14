@@ -539,6 +539,8 @@ sequenceDiagram
 
 ### Fluxo de Autenticação
 
+#### Login
+
 ```mermaid
 sequenceDiagram
     participant User as Usuário
@@ -556,6 +558,34 @@ sequenceDiagram
     Context->>DB: Busca profile
     DB->>Context: Retorna profile
     Context->>Auth: Re-render (user != null)
+    Auth->>Auth: navigate('/dashboard')
+```
+
+#### Recuperação de Senha
+
+```mermaid
+sequenceDiagram
+    participant User as Usuário
+    participant Auth as Auth Page
+    participant Context as AuthContext
+    participant Supabase as Supabase Auth
+    participant Email as Email Service
+    
+    User->>Auth: Clica "Esqueceu a senha?"
+    Auth->>Auth: Abre modal
+    User->>Auth: Informa email
+    Auth->>Context: resetPassword(email)
+    Context->>Supabase: resetPasswordForEmail()
+    Supabase->>Email: Envia email com link
+    Email->>User: Link de recuperação
+    User->>Auth: Clica no link
+    Auth->>Auth: Detecta ?recovery=true
+    Auth->>Supabase: setSession(recoveryToken)
+    Supabase->>Auth: Sessão de recuperação
+    User->>Auth: Informa nova senha
+    Auth->>Context: updatePassword(newPassword)
+    Context->>Supabase: updateUser({ password })
+    Supabase->>Context: Senha atualizada
     Auth->>Auth: navigate('/dashboard')
 ```
 
@@ -599,18 +629,36 @@ graph LR
 
 ```typescript
 // geminiService.ts
-export const generateTeamSummary = async (users: User[]): Promise<string> => {
+export const generateTeamSummary = async (
+  users: User[], 
+  viewMode: 'mensal' | 'anual' = 'mensal',
+  selectedMonth?: number,
+  selectedYear?: number
+): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
   
-  const teamContext = users.map(u => 
-    `- ${u.name} (${u.role}): Status ${u.status}, 
-     Férias este mês: ${u.plannedVacations.length > 0 
-       ? u.plannedVacations.join(',') : 'Nenhuma'}`
-  ).join('\n');
+  // Formatar contexto baseado no modo de visualização
+  const teamContext = users.map(u => {
+    if (viewMode === 'mensal' && selectedMonth !== undefined) {
+      // Modo mensal: mostrar dias específicos do mês
+      const monthName = months[selectedMonth];
+      return `- ${u.name} (${u.role}): Status ${u.status}, Férias em ${monthName}: ${u.plannedVacations.join(', ') || 'Nenhuma'}`;
+    } else {
+      // Modo anual: mostrar férias organizadas por mês
+      // Decodificar formato: mês*1000 + dia
+      const annualData = /* processar dados anuais */;
+      return `- ${u.name} (${u.role}): Status ${u.status}, Férias no ano: ${formatAnnualVacations(annualData)}`;
+    }
+  }).join('\n');
+
+  const periodContext = viewMode === 'mensal' 
+    ? `${months[selectedMonth]} de ${selectedYear}`
+    : `ano de ${selectedYear}`;
 
   const prompt = `
-    Abaixo está uma lista da equipe e seus status de férias. 
+    Abaixo está uma lista da equipe e seus status de férias para o ${periodContext}. 
     Gere um resumo executivo curto (máximo 150 palavras) em Português do Brasil.
+    ${viewMode === 'anual' ? 'Analise a distribuição de férias ao longo do ano e identifique períodos críticos.' : ''}
     
     Equipe:
     ${teamContext}
@@ -623,6 +671,30 @@ export const generateTeamSummary = async (users: User[]): Promise<string> => {
   
   return response.text || "Erro ao gerar resumo.";
 };
+```
+
+### Fluxo de Análise de Disponibilidade
+
+```mermaid
+sequenceDiagram
+    participant User as Usuário
+    participant Dashboard as Dashboard
+    participant Handler as handleGetAiSummary
+    participant Service as geminiService
+    participant Gemini as Google Gemini AI
+    
+    User->>Dashboard: Seleciona período (mensal/anual)
+    User->>Dashboard: Clica "Pedir Resumo IA"
+    Dashboard->>Handler: viewMode, selectedMonth, selectedYear
+    Handler->>Handler: Coleta dados do período
+    Note over Handler: Modo mensal: apenas mês selecionado<br/>Modo anual: todos os 12 meses
+    Handler->>Service: generateTeamSummary(users, viewMode, month, year)
+    Service->>Service: Formata contexto baseado no modo
+    Service->>Gemini: API Request com prompt contextualizado
+    Gemini->>Service: Resposta com análise
+    Service->>Handler: Texto do resumo
+    Handler->>Dashboard: setAiSummary(summary)
+    Dashboard->>User: Exibe análise do período selecionado
 ```
 
 ---

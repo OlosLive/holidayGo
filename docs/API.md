@@ -313,16 +313,24 @@ Serviço de integração com Google Gemini AI para gerar resumos inteligentes.
 #### Função Principal
 
 ```typescript
-export const generateTeamSummary = async (users: User[]): Promise<string>
+export const generateTeamSummary = async (
+  users: User[], 
+  viewMode?: 'mensal' | 'anual',
+  selectedMonth?: number,
+  selectedYear?: number
+): Promise<string>
 ```
 
-Gera um resumo executivo em português sobre o status de férias da equipe.
+Gera um resumo executivo em português sobre o status de férias da equipe, respeitando o período selecionado (mensal ou anual).
 
 #### Parâmetros
 
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-----------|
 | `users` | `User[]` | Array de colaboradores a analisar |
+| `viewMode` | `'mensal' \| 'anual'` | Modo de visualização (opcional, padrão: 'mensal') |
+| `selectedMonth` | `number` | Mês selecionado (0-11, opcional, usado apenas no modo mensal) |
+| `selectedYear` | `number` | Ano selecionado (opcional) |
 
 #### Retorno
 
@@ -336,38 +344,73 @@ Gera um resumo executivo em português sobre o status de férias da equipe.
 import { GoogleGenAI } from "@google/genai";
 import { User } from "./types";
 
-export const generateTeamSummary = async (users: User[]): Promise<string> => {
-  // Inicializa cliente Gemini
-  const ai = new GoogleGenAI({ 
-    apiKey: process.env.API_KEY || "" 
-  });
-  
-  // Formata contexto da equipe
-  const teamContext = users.map(u => 
-    `- ${u.name} (${u.role}): Status ${u.status}, Férias este mês: ${
-      u.plannedVacations.length > 0 
-        ? u.plannedVacations.join(',') 
-        : 'Nenhuma'
-    }`
-  ).join('\n');
+const months = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
 
-  // Constrói prompt estruturado
+export const generateTeamSummary = async (
+  users: User[], 
+  viewMode: 'mensal' | 'anual' = 'mensal',
+  selectedMonth?: number,
+  selectedYear?: number
+): Promise<string> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+  
+  // Formatar contexto da equipe baseado no modo de visualização
+  const teamContext = users.map(u => {
+    if (viewMode === 'mensal' && selectedMonth !== undefined) {
+      // Modo mensal: mostrar dias específicos do mês
+      const monthName = months[selectedMonth];
+      const vacationDays = u.plannedVacations;
+      return `- ${u.name} (${u.role}): Status ${u.status}, Férias em ${monthName}: ${vacationDays.length > 0 ? vacationDays.join(', ') : 'Nenhuma'}`;
+    } else {
+      // Modo anual: mostrar férias por mês
+      const annualData: { [month: number]: number[] } = {};
+      u.plannedVacations.forEach(vacation => {
+        // Decodificar formato: mês*1000 + dia
+        const month = Math.floor(vacation / 1000);
+        const day = vacation % 1000;
+        if (!annualData[month]) {
+          annualData[month] = [];
+        }
+        annualData[month].push(day);
+      });
+      
+      const vacationsByMonth = Object.entries(annualData)
+        .sort(([a], [b]) => parseInt(a) - parseInt(b))
+        .map(([month, days]) => {
+          const monthName = months[parseInt(month) - 1];
+          const totalDays = days.length;
+          return `${monthName} (${totalDays} dia${totalDays > 1 ? 's' : ''}): dias ${days.join(', ')}`;
+        })
+        .join('; ');
+      
+      return `- ${u.name} (${u.role}): Status ${u.status}, Férias no ano: ${vacationsByMonth || 'Nenhuma'}`;
+    }
+  }).join('\n');
+
+  const periodContext = viewMode === 'mensal' && selectedMonth !== undefined && selectedYear !== undefined
+    ? `${months[selectedMonth]} de ${selectedYear}`
+    : selectedYear !== undefined
+    ? `ano de ${selectedYear}`
+    : 'período selecionado';
+
   const prompt = `
-    Abaixo está uma lista da equipe e seus status de férias. 
+    Abaixo está uma lista da equipe e seus status de férias para o ${periodContext}. 
     Gere um resumo executivo curto (máximo 150 palavras) em Português do Brasil para o gestor de RH.
-    Destaque quem está de férias e se há algum risco de sobrecarga ou muitos usuários ausentes.
+    Destaque quem está de férias no ${periodContext} e se há algum risco de sobrecarga ou muitos usuários ausentes.
+    ${viewMode === 'anual' ? 'Analise a distribuição de férias ao longo do ano e identifique períodos críticos ou meses com alta concentração de ausências.' : ''}
     
     Equipe:
     ${teamContext}
   `;
 
   try {
-    // Chama API Gemini
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    
     return response.text || "Não foi possível gerar o resumo no momento.";
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -379,11 +422,31 @@ export const generateTeamSummary = async (users: User[]): Promise<string> => {
 #### Exemplo de Uso
 
 ```typescript
-// Em Dashboard.tsx
+// Em Dashboard.tsx - Modo Mensal
 const handleGetAiSummary = async () => {
   setIsLoadingSummary(true);
   
-  const summary = await generateTeamSummary(users);
+  const summary = await generateTeamSummary(
+    users, 
+    'mensal', 
+    selectedMonth, 
+    selectedYear
+  );
+  
+  setAiSummary(summary);
+  setIsLoadingSummary(false);
+};
+
+// Modo Anual
+const handleGetAiSummary = async () => {
+  setIsLoadingSummary(true);
+  
+  const summary = await generateTeamSummary(
+    users, 
+    'anual', 
+    undefined, 
+    selectedYear
+  );
   
   setAiSummary(summary);
   setIsLoadingSummary(false);
