@@ -82,31 +82,11 @@ Senha: password
 
 4. Você será automaticamente logado
 
-### Recuperando a Senha
+### Esqueci Minha Senha
 
-Se você esqueceu sua senha, siga estes passos:
-
-1. **Na tela de login**, clique no link **"Esqueceu a senha?"** abaixo do campo de senha
-
-2. **Digite seu email** no modal que aparecer
-   - Informe o mesmo email cadastrado no sistema
-   - Clique em **"Enviar"**
-
-3. **Verifique sua caixa de entrada**
-   - Você receberá um email com um link de recuperação
-   - O link expira após algumas horas
-
-4. **Clique no link do email**
-   - Você será redirecionado para a página de redefinição de senha
-   - Digite sua nova senha (mínimo 6 caracteres)
-   - Confirme a nova senha
-
-5. **Conclua a redefinição**
-   - Clique em **"Atualizar Senha"**
-   - Você será automaticamente redirecionado para o Dashboard
-   - Use sua nova senha para fazer login
-
-> 💡 **Dica**: Se não receber o email, verifique sua pasta de spam ou lixo eletrônico.
+1. Na tela de login, clique em **"Esqueceu a senha?"**
+2. Siga as instruções para recuperação
+3. Verifique seu email para o link de redefinição
 
 ---
 
@@ -198,51 +178,30 @@ O Dashboard é a página principal do sistema. Aqui você tem uma visão complet
 
 ### Análise com Inteligência Artificial
 
-O holidayGo utiliza IA do Google Gemini para gerar insights sobre sua equipe. A análise **sempre respeita os filtros de visualização** que você selecionou (mensal ou anual).
+O holidayGo utiliza IA do Google Gemini para gerar insights sobre sua equipe.
 
 **Como usar:**
 
-1. **Selecione o período desejado**
-   - Escolha entre visualização **Mensal** ou **Anual**
-   - Se mensal, selecione o mês específico
-   - Selecione o ano
+1. Role a página até a seção **"Análise de Disponibilidade"**
 
-2. **Role a página até a seção "Análise de Disponibilidade"**
+2. Clique no botão **"Pedir Resumo IA"**
 
-3. **Clique no botão "Pedir Resumo IA"**
+3. Aguarde alguns segundos enquanto a IA processa
 
-4. **Aguarde alguns segundos** enquanto a IA processa
+4. Leia o resumo gerado, que pode incluir:
+   - Quem está de férias no período
+   - Riscos de sobrecarga operacional
+   - Recomendações para o RH
+   - Alertas sobre saldos críticos
 
-5. **Leia o resumo gerado**, que será baseado no período selecionado:
-   - **Modo Mensal**: Analisa apenas o mês selecionado
-     - Quem está de férias naquele mês específico
-     - Dias específicos de ausência
-     - Riscos de sobrecarga no período mensal
-   
-   - **Modo Anual**: Analisa todo o ano selecionado
-     - Distribuição de férias ao longo dos 12 meses
-     - Períodos críticos com alta concentração de ausências
-     - Meses com maior risco de sobrecarga
-     - Recomendações para distribuição equilibrada
-
-**Exemplo de resumo (Modo Mensal):**
+**Exemplo de resumo:**
 ```
-"A equipe está em boa condição operacional para Janeiro de 2025. 
-Allan está programado para 5 dias de férias (dias 5-9). 
-A maioria dos colaboradores permanece ativa sem ausências 
-planejadas. Não há risco significativo de sobrecarga no período."
+"A equipe está em boa condição operacional. Allan está 
+programado para 5 dias de férias no início do mês. 
+Recomenda-se atenção aos colaboradores com saldo alto 
+de férias para evitar vencimento. Não há risco significativo 
+de sobrecarga no período analisado."
 ```
-
-**Exemplo de resumo (Modo Anual):**
-```
-"Análise anual da equipe para 2025. Identificamos concentração 
-de férias em Julho (15 dias) e Dezembro (12 dias), períodos que 
-requerem atenção especial. Janeiro e Fevereiro apresentam baixa 
-ausência, ideal para planejamento de projetos. Recomenda-se 
-redistribuir algumas férias de Julho para outros meses."
-```
-
-> 💡 **Dica**: Use o modo anual para planejamento estratégico e o modo mensal para análises operacionais detalhadas.
 
 ### Estatísticas do Dashboard
 

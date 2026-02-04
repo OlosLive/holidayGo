@@ -1,18 +1,17 @@
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useProfiles } from '../hooks/useProfiles';
-import { useVacations } from '../hooks/useVacations';
+import { User } from '../types';
 import { generateTeamSummary } from '../geminiService';
-import type { Profile } from '../types/database';
 
-const Dashboard: React.FC = () => {
-  const { profiles, loading: profilesLoading, error: profilesError } = useProfiles();
-  const { vacations, loading: vacationsLoading, error: vacationsError } = useVacations();
-  
+interface DashboardProps {
+  users: User[];
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ users }) => {
   const [viewMode, setViewMode] = useState<'mensal' | 'anual'>('mensal');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // Current month (0-indexed)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(6); // Julho (0-indexed)
+  const [selectedYear, setSelectedYear] = useState(2026);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
 
@@ -45,24 +44,26 @@ const Dashboard: React.FC = () => {
 
   const daysHeader = Array.from({ length: getDaysInMonth(selectedMonth, selectedYear) }, (_, i) => i + 1);
 
-  // Get vacation days for a user in a specific month
-  const getVacationDaysForMonth = (userId: string, year: number, month: number): number[] => {
-    // Month is 1-indexed in the database
-    return vacations
-      .filter(v => v.user_id === userId && v.year === year && v.month === month + 1)
-      .map(v => v.day);
+  const handleGetAiSummary = async () => {
+    setIsLoadingSummary(true);
+    const summary = await generateTeamSummary(users);
+    setAiSummary(summary);
+    setIsLoadingSummary(false);
   };
 
-  // Get total vacation days for a user in a specific month
-  const getAnnualData = (userId: string, monthIdx: number) => {
-    return vacations.filter(
-      v => v.user_id === userId && v.year === selectedYear && v.month === monthIdx + 1
-    ).length;
+  // Get real vacation data for a user in a specific month
+  const getAnnualData = (user: User, monthIdx: number) => {
+    // Only July 2026 has real data in the system
+    if (monthIdx === 6 && selectedYear === 2026) {
+      return user.plannedVacations.length;
+    }
+    // Other months have no data yet
+    return 0;
   };
 
   // Calculate monthly totals for the team
   const getMonthlyTeamTotal = (monthIdx: number) => {
-    return profiles.reduce((total, profile) => total + getAnnualData(profile.id, monthIdx), 0);
+    return users.reduce((total, user) => total + getAnnualData(user, monthIdx), 0);
   };
 
   // Get status color for vacation balance
@@ -75,104 +76,6 @@ const Dashboard: React.FC = () => {
 
   // Get current month (0-indexed)
   const currentMonth = new Date().getMonth();
-
-  // Prepare data for AI summary
-  const handleGetAiSummary = async () => {
-    setIsLoadingSummary(true);
-    
-    // Convert profiles to the format expected by geminiService
-    const usersForAI = profiles.map(profile => {
-      let plannedVacations: number[] = [];
-      
-      if (viewMode === 'mensal') {
-        // Modo mensal: apenas o mês selecionado
-        plannedVacations = getVacationDaysForMonth(profile.id, selectedYear, selectedMonth);
-      } else {
-        // Modo anual: todos os meses do ano
-        // Coletar todos os dias de férias do ano, organizados por mês
-        // Usar formato: mês*1000 + dia para facilitar decodificação
-        const annualVacations: { month: number; days: number[] }[] = [];
-        for (let monthIdx = 0; monthIdx < 12; monthIdx++) {
-          const monthDays = getVacationDaysForMonth(profile.id, selectedYear, monthIdx);
-          if (monthDays.length > 0) {
-            annualVacations.push({ month: monthIdx, days: monthDays });
-          }
-        }
-        // Converter para formato codificado: mês*1000 + dia (permite até 999 dias por mês)
-        plannedVacations = annualVacations.flatMap(m => m.days.map(d => (m.month + 1) * 1000 + d));
-      }
-      
-      return {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        role: profile.role || 'Sem cargo',
-        department: profile.department || 'Sem departamento',
-        hireDate: profile.hire_date || '',
-        status: profile.status as 'Ativo' | 'Inativo' | 'Férias' | 'Pendente',
-        vacationBalance: profile.vacation_balance,
-        vacationUsed: profile.vacation_used,
-        plannedVacations: plannedVacations,
-      };
-    });
-    
-    const summary = await generateTeamSummary(
-      usersForAI, 
-      viewMode, 
-      viewMode === 'mensal' ? selectedMonth : undefined, 
-      selectedYear
-    );
-    setAiSummary(summary);
-    setIsLoadingSummary(false);
-  };
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const avgVacations = profiles.length > 0 
-      ? (profiles.reduce((acc, p) => acc + getAnnualData(p.id, currentMonth), 0) / profiles.length).toFixed(1)
-      : '0';
-    
-    // Find peak month
-    const monthTotals = shortMonths.map((_, idx) => ({
-      month: months[idx],
-      total: getMonthlyTeamTotal(idx)
-    }));
-    const peakMonth = monthTotals.reduce((max, curr) => curr.total > max.total ? curr : max, { month: '', total: 0 });
-    
-    return { avgVacations, peakMonth };
-  }, [profiles, vacations, selectedYear]);
-
-  const loading = profilesLoading || vacationsLoading;
-  const error = profilesError || vacationsError;
-
-  if (loading) {
-    return (
-      <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-[1920px] mx-auto">
-        <div className="flex items-center justify-center h-64">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-10 w-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <p className="text-slate-500 dark:text-slate-400 font-medium">Carregando dashboard...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-[1920px] mx-auto">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <span className="material-icons-round text-red-500 text-2xl">error</span>
-            <div>
-              <h3 className="text-lg font-bold text-red-700 dark:text-red-400">Erro ao carregar dados</h3>
-              <p className="text-red-600 dark:text-red-300">{error}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-[1920px] mx-auto">
@@ -248,286 +151,281 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {profiles.length === 0 ? (
-        <div className="bg-white dark:bg-surface-dark rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-12 text-center mb-8">
-          <span className="material-icons-round text-6xl text-slate-300 dark:text-slate-600 mb-4">group_off</span>
-          <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Nenhum colaborador cadastrado</h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-6">Adicione colaboradores para começar a gerenciar férias.</p>
-          <Link
-            to="/users/add"
-            className="inline-flex items-center px-6 py-3 bg-primary hover:bg-primary-dark text-white rounded-lg shadow-lg shadow-primary/20 transition-all font-medium"
-          >
-            <span className="material-icons-round text-sm mr-2">add</span>
-            Adicionar Colaborador
-          </Link>
-        </div>
-      ) : (
-        <>
-          {/* View Container */}
-          <div className="bg-white dark:bg-surface-dark shadow-2xl shadow-slate-200/50 dark:shadow-none rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden mb-8">
-            <div className="overflow-x-auto custom-scrollbar">
-              {viewMode === 'mensal' ? (
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                  <thead className="bg-slate-50 dark:bg-slate-900/50">
-                    <tr>
-                      <th className="sticky left-0 z-10 px-4 py-3 text-left text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 min-w-[200px]">
-                        Equipe
+      {/* View Container */}
+      <div className="bg-white dark:bg-surface-dark shadow-2xl shadow-slate-200/50 dark:shadow-none rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden mb-8">
+        <div className="overflow-x-auto custom-scrollbar">
+          {viewMode === 'mensal' ? (
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+              <thead className="bg-slate-50 dark:bg-slate-900/50">
+                <tr>
+                  <th className="sticky left-0 z-10 px-4 py-3 text-left text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 min-w-[200px]">
+                    Equipe
+                  </th>
+                  {daysHeader.map((day, idx) => {
+                    const label = getMonthWeekDays[idx];
+                    const isWeekend = label === 'S' || label === 'D';
+                    return (
+                      <th key={day} className={`px-1 py-2 text-center border-l border-slate-200 dark:border-slate-800 min-w-[36px] ${isWeekend ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <div className="text-[11px] font-black">{day}</div>
+                        <div className="text-[9px] font-bold uppercase opacity-60">{label}</div>
                       </th>
-                      {daysHeader.map((day, idx) => {
-                        const label = getMonthWeekDays[idx];
-                        const isWeekend = label === 'S' || label === 'D';
-                        return (
-                          <th key={day} className={`px-1 py-2 text-center border-l border-slate-200 dark:border-slate-800 min-w-[36px] ${isWeekend ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'text-slate-500 dark:text-slate-400'}`}>
-                            <div className="text-[11px] font-black">{day}</div>
-                            <div className="text-[9px] font-bold uppercase opacity-60">{label}</div>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {profiles.map((profile) => {
-                      const vacationDays = getVacationDaysForMonth(profile.id, selectedYear, selectedMonth);
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {users.map((user) => (
+                  <tr key={user.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
+                    <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap bg-white dark:bg-surface-dark border-r border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-xs uppercase group-hover:scale-110 transition-transform">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div>
+                          <span className="block text-sm font-bold dark:text-white leading-tight">{user.name}</span>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{user.role}</span>
+                        </div>
+                      </div>
+                    </td>
+                    {daysHeader.map((day, idx) => {
+                      const label = getMonthWeekDays[idx];
+                      const isWeekend = label === 'S' || label === 'D';
+                      // For now, we only highlight if it's the "selected" month (Jul 2026 mock)
+                      const isVacation = (selectedMonth === 6 && selectedYear === 2026) && user.plannedVacations.includes(day);
                       return (
-                        <tr key={profile.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
-                          <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap bg-white dark:bg-surface-dark border-r border-slate-200 dark:border-slate-800">
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-xs uppercase group-hover:scale-110 transition-transform">
-                                {profile.name.charAt(0)}
-                              </div>
-                              <div>
-                                <span className="block text-sm font-bold dark:text-white leading-tight">{profile.name}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{profile.role || 'Sem cargo'}</span>
+                        <td key={day} className={`border-l border-slate-100 dark:border-slate-800/50 h-10 p-0.5 ${isWeekend ? 'bg-slate-50/30 dark:bg-slate-800/10' : ''}`}>
+                          {isVacation && (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <div className="w-7 h-7 bg-primary/90 dark:bg-primary rounded-md shadow-sm transform hover:scale-110 transition-all cursor-pointer flex items-center justify-center group/item" title={`${user.name} em férias`}>
+                                <span className="material-icons-round text-white text-[12px] opacity-80 group-hover/item:opacity-100">beach_access</span>
                               </div>
                             </div>
-                          </td>
-                          {daysHeader.map((day, idx) => {
-                            const label = getMonthWeekDays[idx];
-                            const isWeekend = label === 'S' || label === 'D';
-                            const isVacation = vacationDays.includes(day);
-                            return (
-                              <td key={day} className={`border-l border-slate-100 dark:border-slate-800/50 h-10 p-0.5 ${isWeekend ? 'bg-slate-50/30 dark:bg-slate-800/10' : ''}`}>
-                                {isVacation && (
-                                  <div className="w-full h-full flex items-center justify-center">
-                                    <div className="w-7 h-7 bg-primary/90 dark:bg-primary rounded-md shadow-sm transform hover:scale-110 transition-all cursor-pointer flex items-center justify-center group/item" title={`${profile.name} em férias`}>
-                                      <span className="material-icons-round text-white text-[12px] opacity-80 group-hover/item:opacity-100">beach_access</span>
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
+                          )}
+                        </td>
                       );
                     })}
-                  </tbody>
-                </table>
-              ) : (
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                  <thead className="bg-slate-50 dark:bg-slate-900/50">
-                    <tr>
-                      <th className="sticky left-0 z-10 px-4 py-3 text-left text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 min-w-[180px]">
-                        Colaborador
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+              <thead className="bg-slate-50 dark:bg-slate-900/50">
+                <tr>
+                  <th className="sticky left-0 z-10 px-4 py-3 text-left text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 min-w-[180px]">
+                    Colaborador
+                  </th>
+                  {shortMonths.map((month, idx) => {
+                    const isCurrentMonth = idx === currentMonth && selectedYear === new Date().getFullYear();
+                    const isJuly2026 = idx === 6 && selectedYear === 2026;
+                    return (
+                      <th key={month} className={`px-2 py-3 text-center border-l border-slate-200 dark:border-slate-800 min-w-[50px] ${
+                        isCurrentMonth ? 'bg-primary/10 dark:bg-primary/20' : ''
+                      } ${isJuly2026 ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                        <div className={`text-[10px] font-black uppercase tracking-wider ${
+                          isCurrentMonth || isJuly2026 ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
+                        }`}>{month}</div>
+                        {isJuly2026 && (
+                          <div className="text-[8px] text-primary font-bold mt-0.5">Com dados</div>
+                        )}
                       </th>
-                      {shortMonths.map((month, idx) => {
-                        const isCurrentMonth = idx === currentMonth && selectedYear === new Date().getFullYear();
-                        return (
-                          <th key={month} className={`px-2 py-3 text-center border-l border-slate-200 dark:border-slate-800 min-w-[50px] ${
-                            isCurrentMonth ? 'bg-primary/10 dark:bg-primary/20' : ''
-                          }`}>
-                            <div className={`text-[10px] font-black uppercase tracking-wider ${
-                              isCurrentMonth ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
-                            }`}>{month}</div>
-                          </th>
-                        );
-                      })}
-                      <th className="px-2 py-3 text-center border-l border-slate-200 dark:border-slate-800 min-w-[55px] bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white">
-                        <div className="text-[10px] font-black uppercase">Total</div>
-                      </th>
-                      <th className="px-2 py-3 text-center border-l border-slate-200 dark:border-slate-800 min-w-[60px] bg-amber-50 dark:bg-amber-900/20">
-                        <div className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400">Saldo</div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {profiles.map((profile) => {
-                      let yearTotal = 0;
-                      const balanceStatus = getBalanceStatus(profile.vacation_balance);
-                      return (
-                        <tr key={profile.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
-                          <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap bg-white dark:bg-surface-dark border-r border-slate-200 dark:border-slate-800">
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-xs uppercase group-hover:scale-110 transition-transform">
-                                {profile.name.charAt(0)}
-                              </div>
-                              <div>
-                                <span className="block text-sm font-bold dark:text-white leading-tight">{profile.name}</span>
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{profile.role || 'Sem cargo'}</span>
-                              </div>
-                            </div>
-                          </td>
-                          {shortMonths.map((_, idx) => {
-                            const days = getAnnualData(profile.id, idx);
-                            yearTotal += days;
-                            const isCurrentMonth = idx === currentMonth && selectedYear === new Date().getFullYear();
-                            return (
-                              <td key={idx} className={`border-l border-slate-100 dark:border-slate-800/50 px-1 py-2 text-center ${
-                                isCurrentMonth ? 'bg-primary/5 dark:bg-primary/10' : ''
-                              }`}>
-                                {days > 0 ? (
-                                  <div 
-                                    className={`inline-flex items-center justify-center min-w-[26px] h-6 rounded-full font-black text-[10px] cursor-pointer hover:scale-110 transition-transform ${
-                                      days >= 15 ? 'bg-primary text-white shadow-md shadow-primary/30' : 
-                                      days >= 10 ? 'bg-primary/80 text-white' : 
-                                      'bg-primary/15 text-primary'
-                                    }`}
-                                    title={`${profile.name}: ${days} dias de férias em ${shortMonths[idx]}`}
-                                  >
-                                    {days}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-300 dark:text-slate-600 text-[10px] font-medium">-</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                          <td className="border-l border-slate-100 dark:border-slate-800/50 px-2 py-2 text-center bg-slate-50/50 dark:bg-slate-800/20">
-                            <span className="text-xs font-black text-slate-900 dark:text-white">{yearTotal}d</span>
-                          </td>
-                          <td className="border-l border-slate-100 dark:border-slate-800/50 px-2 py-2 text-center bg-amber-50/50 dark:bg-amber-900/10">
-                            <div className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-black ${balanceStatus.color}`}>
-                              {profile.vacation_balance}d
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {/* Team Totals Row */}
-                    <tr className="bg-slate-100 dark:bg-slate-800/50 font-bold">
-                      <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap bg-slate-100 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700">
+                    );
+                  })}
+                  <th className="px-2 py-3 text-center border-l border-slate-200 dark:border-slate-800 min-w-[55px] bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white">
+                    <div className="text-[10px] font-black uppercase">Total</div>
+                  </th>
+                  <th className="px-2 py-3 text-center border-l border-slate-200 dark:border-slate-800 min-w-[60px] bg-amber-50 dark:bg-amber-900/20">
+                    <div className="text-[10px] font-black uppercase text-amber-700 dark:text-amber-400">Saldo</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {users.map((user) => {
+                  let yearTotal = 0;
+                  const balanceStatus = getBalanceStatus(user.vacationBalance);
+                  return (
+                    <tr key={user.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
+                      <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap bg-white dark:bg-surface-dark border-r border-slate-200 dark:border-slate-800">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
-                            <span className="material-icons-round text-base">groups</span>
+                          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-primary font-black text-xs uppercase group-hover:scale-110 transition-transform">
+                            {user.name.charAt(0)}
                           </div>
                           <div>
-                            <span className="block text-sm font-black text-slate-700 dark:text-slate-200 leading-tight">Total Equipe</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{profiles.length} colaboradores</span>
+                            <span className="block text-sm font-bold dark:text-white leading-tight">{user.name}</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{user.role}</span>
                           </div>
                         </div>
                       </td>
                       {shortMonths.map((_, idx) => {
-                        const monthTotal = getMonthlyTeamTotal(idx);
+                        const days = getAnnualData(user, idx);
+                        yearTotal += days;
+                        const isCurrentMonth = idx === currentMonth && selectedYear === new Date().getFullYear();
+                        const isJuly2026 = idx === 6 && selectedYear === 2026;
                         return (
-                          <td key={idx} className="border-l border-slate-200 dark:border-slate-700 px-1 py-2 text-center">
-                            {monthTotal > 0 ? (
-                              <div className={`inline-flex items-center justify-center min-w-[26px] h-6 rounded-full font-black text-[10px] ${
-                                monthTotal >= 20 ? 'bg-red-500 text-white' : 
-                                monthTotal >= 10 ? 'bg-amber-500 text-white' : 
-                                'bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-200'
-                              }`}>
-                                {monthTotal}
+                          <td key={idx} className={`border-l border-slate-100 dark:border-slate-800/50 px-1 py-2 text-center ${
+                            isCurrentMonth ? 'bg-primary/5 dark:bg-primary/10' : ''
+                          } ${isJuly2026 ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
+                            {days > 0 ? (
+                              <div 
+                                className={`inline-flex items-center justify-center min-w-[26px] h-6 rounded-full font-black text-[10px] cursor-pointer hover:scale-110 transition-transform ${
+                                  days >= 15 ? 'bg-primary text-white shadow-md shadow-primary/30' : 
+                                  days >= 10 ? 'bg-primary/80 text-white' : 
+                                  'bg-primary/15 text-primary'
+                                }`}
+                                title={`${user.name}: ${days} dias de férias em ${shortMonths[idx]}`}
+                              >
+                                {days}
                               </div>
                             ) : (
-                              <span className="text-slate-400 dark:text-slate-500 text-[10px] font-medium">0</span>
+                              <span className="text-slate-300 dark:text-slate-600 text-[10px] font-medium">-</span>
                             )}
                           </td>
                         );
                       })}
-                      <td className="border-l border-slate-200 dark:border-slate-700 px-2 py-2 text-center bg-slate-200/50 dark:bg-slate-700/50">
-                        <span className="text-xs font-black text-slate-900 dark:text-white">
-                          {profiles.reduce((total, profile) => {
-                            let userTotal = 0;
-                            shortMonths.forEach((_, idx) => {
-                              userTotal += getAnnualData(profile.id, idx);
-                            });
-                            return total + userTotal;
-                          }, 0)}d
-                        </span>
+                      <td className="border-l border-slate-100 dark:border-slate-800/50 px-2 py-2 text-center bg-slate-50/50 dark:bg-slate-800/20">
+                        <span className="text-xs font-black text-slate-900 dark:text-white">{yearTotal}d</span>
                       </td>
-                      <td className="border-l border-slate-200 dark:border-slate-700 px-2 py-2 text-center bg-amber-100/50 dark:bg-amber-900/20">
-                        <span className="text-xs font-black text-amber-700 dark:text-amber-400">
-                          {profiles.reduce((total, profile) => total + profile.vacation_balance, 0)}d
-                        </span>
+                      <td className="border-l border-slate-100 dark:border-slate-800/50 px-2 py-2 text-center bg-amber-50/50 dark:bg-amber-900/10">
+                        <div className={`inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-black ${balanceStatus.color}`}>
+                          {user.vacationBalance}d
+                        </div>
                       </td>
                     </tr>
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Stats Cards - Three in a row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
-          <div className="p-4 bg-primary/10 rounded-2xl text-primary">
-            <span className="material-icons-round text-3xl">beach_access</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Média de Férias/Mês</p>
-            <h4 className="text-2xl font-black dark:text-white">{stats.avgVacations} dias</h4>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
-          <div className="p-4 bg-red-100 rounded-2xl text-red-500">
-            <span className="material-icons-round text-3xl">event_busy</span>
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Pico de Ausência</p>
-            <h4 className="text-2xl font-black dark:text-white">
-              {stats.peakMonth.total > 0 ? `${stats.peakMonth.month} / ${selectedYear}` : 'Sem dados'}
-            </h4>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Legenda</p>
-          <ul className="space-y-2">
-            <li className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-primary rounded-md shadow-sm"></div>
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Férias Confirmadas</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"></div>
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Finais de Semana</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <div className="w-4 h-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md"></div>
-              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Disponibilidade Total</span>
-            </li>
-          </ul>
+                  );
+                })}
+                {/* Team Totals Row */}
+                <tr className="bg-slate-100 dark:bg-slate-800/50 font-bold">
+                  <td className="sticky left-0 z-10 px-4 py-2 whitespace-nowrap bg-slate-100 dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                        <span className="material-icons-round text-base">groups</span>
+                      </div>
+                      <div>
+                        <span className="block text-sm font-black text-slate-700 dark:text-slate-200 leading-tight">Total Equipe</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">{users.length} colaboradores</span>
+                      </div>
+                    </div>
+                  </td>
+                  {shortMonths.map((_, idx) => {
+                    const monthTotal = getMonthlyTeamTotal(idx);
+                    const isJuly2026 = idx === 6 && selectedYear === 2026;
+                    return (
+                      <td key={idx} className={`border-l border-slate-200 dark:border-slate-700 px-1 py-2 text-center ${
+                        isJuly2026 ? 'bg-blue-100/50 dark:bg-blue-900/20' : ''
+                      }`}>
+                        {monthTotal > 0 ? (
+                          <div className={`inline-flex items-center justify-center min-w-[26px] h-6 rounded-full font-black text-[10px] ${
+                            monthTotal >= 20 ? 'bg-red-500 text-white' : 
+                            monthTotal >= 10 ? 'bg-amber-500 text-white' : 
+                            'bg-slate-300 dark:bg-slate-600 text-slate-700 dark:text-slate-200'
+                          }`}>
+                            {monthTotal}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 text-[10px] font-medium">0</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="border-l border-slate-200 dark:border-slate-700 px-2 py-2 text-center bg-slate-200/50 dark:bg-slate-700/50">
+                    <span className="text-xs font-black text-slate-900 dark:text-white">
+                      {users.reduce((total, user) => {
+                        let userTotal = 0;
+                        shortMonths.forEach((_, idx) => {
+                          userTotal += getAnnualData(user, idx);
+                        });
+                        return total + userTotal;
+                      }, 0)}d
+                    </span>
+                  </td>
+                  <td className="border-l border-slate-200 dark:border-slate-700 px-2 py-2 text-center bg-amber-100/50 dark:bg-amber-900/20">
+                    <span className="text-xs font-black text-amber-700 dark:text-amber-400">
+                      {users.reduce((total, user) => total + user.vacationBalance, 0)}d
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* AI Analysis - Full Width */}
-      <div className="mt-6 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/10 dark:to-blue-900/10 p-7 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-black flex items-center gap-2 dark:text-white font-display">
-            <span className="material-icons-round text-blue-500">auto_awesome</span>
-            Análise de Disponibilidade
-          </h3>
-          <button 
-            onClick={handleGetAiSummary}
-            disabled={isLoadingSummary || profiles.length === 0}
-            className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 font-black shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoadingSummary ? 'Processando...' : 'Pedir Resumo IA'}
-          </button>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
+            <div className="p-4 bg-primary/10 rounded-2xl text-primary">
+              <span className="material-icons-round text-3xl">beach_access</span>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Média Mensal</p>
+              <h4 className="text-2xl font-black dark:text-white">5.2 Colaboradores</h4>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-5">
+            <div className="p-4 bg-red-100 rounded-2xl text-red-500">
+              <span className="material-icons-round text-3xl">event_busy</span>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Pico de Ausência</p>
+              <h4 className="text-2xl font-black dark:text-white">Janeiro / {selectedYear}</h4>
+            </div>
+          </div>
+
+          <div className="md:col-span-2 bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-900/10 dark:to-blue-900/10 p-7 rounded-2xl border border-blue-100 dark:border-blue-900/30 shadow-sm">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-black flex items-center gap-2 dark:text-white font-display">
+                <span className="material-icons-round text-blue-500">auto_awesome</span>
+                Análise de Disponibilidade
+              </h3>
+              <button 
+                onClick={handleGetAiSummary}
+                disabled={isLoadingSummary}
+                className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition-all flex items-center gap-2 font-black shadow-lg shadow-blue-500/20"
+              >
+                {isLoadingSummary ? 'Processando...' : 'Pedir Resumo IA'}
+              </button>
+            </div>
+            {aiSummary ? (
+              <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line animate-in fade-in duration-500">
+                {aiSummary}
+              </p>
+            ) : (
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para {selectedYear}.
+              </p>
+            )}
+          </div>
         </div>
-        {aiSummary ? (
-          <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-line animate-in fade-in duration-500">
-            {aiSummary}
-          </p>
-        ) : (
-          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-            {profiles.length === 0 
-              ? 'Adicione colaboradores para usar a análise de IA.'
-              : viewMode === 'mensal'
-              ? `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para ${months[selectedMonth]} de ${selectedYear}.`
-              : `Clique no botão acima para que a inteligência artificial analise a escala da sua equipe e forneça recomendações de cobertura para o ano de ${selectedYear}, identificando períodos críticos e distribuição de férias.`
-            }
-          </p>
-        )}
+
+        <div className="bg-white dark:bg-surface-dark p-7 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h3 className="text-lg font-black mb-6 dark:text-white font-display uppercase tracking-widest text-xs opacity-50">Legenda</h3>
+          <ul className="space-y-5">
+            <li className="flex items-center gap-4">
+              <div className="w-5 h-5 bg-primary rounded-lg shadow-sm"></div>
+              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Férias Confirmadas</span>
+            </li>
+            <li className="flex items-center gap-4">
+              <div className="w-5 h-5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"></div>
+              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Finais de Semana</span>
+            </li>
+            <li className="flex items-center gap-4">
+              <div className="w-5 h-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"></div>
+              <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Disponibilidade Total</span>
+            </li>
+          </ul>
+          
+          <div className="mt-10 pt-8 border-t border-slate-100 dark:border-slate-800">
+            <p className="text-xs font-bold text-slate-400 uppercase mb-4 tracking-tighter">Exportar Relatórios</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" title="Exportar PDF">
+                <span className="material-icons-round text-slate-400">picture_as_pdf</span>
+              </button>
+              <button className="flex items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" title="Exportar Excel">
+                <span className="material-icons-round text-slate-400">table_chart</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

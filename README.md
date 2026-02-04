@@ -8,10 +8,9 @@
 [![React](https://img.shields.io/badge/React-19.2.3-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.2-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 [![Google AI](https://img.shields.io/badge/Google_AI-Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 
-[Arquitetura](docs/ARCHITECTURE.md) • [Desenvolvimento](docs/DEVELOPMENT.md) • [Componentes](docs/COMPONENTS.md) • [API](docs/API.md) • [Guia do Usuário](docs/USER_GUIDE.md)
+[Documentação Completa](docs/) • [Guia do Usuário](docs/USER_GUIDE.md) • [Arquitetura](docs/ARCHITECTURE.md)
 
 </div>
 
@@ -23,13 +22,11 @@ O **holidayGo** é uma aplicação web moderna e intuitiva desenvolvida para fac
 
 ### ✨ Principais Funcionalidades
 
-- 🔐 **Autenticação Completa** - Login, registro e proteção de rotas com Supabase Auth
 - 📅 **Dashboard Interativo** - Visualização mensal e anual de férias agendadas
 - 🗓️ **Planejamento Visual** - Calendário interativo para agendar férias de forma intuitiva
-- 👥 **Gestão de Colaboradores** - CRUD completo de usuários com persistência em banco de dados
+- 👥 **Gestão de Colaboradores** - CRUD completo de usuários com informações detalhadas
 - 📊 **Análise de Resumo** - Acompanhamento de dias disponíveis e alertas de vencimento
 - 🤖 **Inteligência Artificial** - Resumos e recomendações gerados pelo Google Gemini AI
-- 🔄 **Real-time Updates** - Atualizações em tempo real via Supabase Realtime
 - 🌙 **Dark Mode** - Suporte completo a tema claro e escuro
 - 📱 **Design Responsivo** - Otimizado para desktop, tablet e mobile
 - 🎨 **Interface Moderna** - Design system consistente com Tailwind CSS
@@ -42,7 +39,6 @@ Antes de iniciar, certifique-se de ter instalado:
 
 - **Node.js** (versão 18 ou superior)
 - **npm** ou **yarn**
-- **Conta no Supabase** ([Criar conta](https://supabase.com/))
 - **Chave de API do Google Gemini** ([Obter aqui](https://ai.google.dev/))
 
 ### Instalação
@@ -60,57 +56,15 @@ cd holidayGo
 npm install
 ```
 
-3. **Configure o Supabase**
-
-   a. Crie um novo projeto no [Supabase Dashboard](https://supabase.com/dashboard)
-   
-   b. Execute o script SQL para criar as tabelas:
-   - Acesse **SQL Editor** no Supabase Dashboard
-   - Execute o conteúdo de `supabase/migrations/001_initial_schema.sql`
-
-   c. Configure a autenticação:
-   - Acesse **Authentication > Settings**
-   - Habilite o provedor Email/Password
-   - (Opcional) Desabilite a confirmação de email para testes
-
-4. **Configure as variáveis de ambiente**
+3. **Configure as variáveis de ambiente**
 
 Crie um arquivo `.env.local` na raiz do projeto:
 
 ```env
-# Supabase
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_chave_anon_aqui
-
-# Google Gemini AI (opcional)
-GEMINI_API_KEY=sua_chave_api_gemini
-
-# Modo Mock (opcional - para desenvolvimento sem Supabase)
-VITE_USE_MOCK_DATA=false
+GEMINI_API_KEY=sua_chave_api_aqui
 ```
 
-> ⚠️ **Importante**: As variáveis do Supabase devem começar com `VITE_` para serem expostas ao frontend.
-
-### Modo de Dados Mockados
-
-O sistema possui um **modo mock** que permite desenvolvimento e testes sem necessidade de conexão com o Supabase. Este modo utiliza `localStorage` para persistir dados localmente.
-
-**Para ativar o modo mock**, adicione ao `.env.local`:
-
-```env
-VITE_USE_MOCK_DATA=true
-```
-
-**Características do modo mock:**
-- 🔐 **Autenticação real** - O login/registro continua usando Supabase Auth
-- 👥 **Dados de perfis mockados** - 10 colaboradores pré-configurados
-- 📅 **Férias mockadas** - Dados de exemplo para visualização
-- 💾 **Persistência local** - Dados salvos no `localStorage` do navegador
-- 🔄 **Reset fácil** - Limpe o `localStorage` para reiniciar os dados
-
-> 💡 **Dica**: Use o modo mock para demonstrações, prototipagem ou quando não tiver acesso ao Supabase.
-
-5. **Execute a aplicação**
+4. **Execute a aplicação**
 
 ```bash
 npm run dev
@@ -129,49 +83,27 @@ npm run preview
 
 ```
 holidayGo/
-├── components/
-│   └── ProtectedRoute.tsx     # Proteção de rotas autenticadas
-├── contexts/
-│   └── AuthContext.tsx        # Contexto de autenticação
-├── hooks/
-│   ├── useAuth.ts            # Hook de autenticação (signIn, signUp, signOut)
-│   ├── useProfiles.ts        # CRUD de colaboradores
-│   └── useVacations.ts       # Gestão de férias
-├── lib/
-│   ├── supabaseClient.ts     # Cliente Supabase configurado
-│   ├── config.ts             # Configurações da aplicação (mock mode)
-│   └── repositories/         # Camada de abstração de dados
-│       ├── interfaces.ts     # Interfaces dos repositórios
-│       ├── index.ts          # Factory para repositórios
-│       ├── mock/             # Implementação com dados mockados
-│       │   ├── mockData.ts   # Dados de exemplo
-│       │   ├── MockProfileRepository.ts
-│       │   └── MockVacationRepository.ts
-│       └── supabase/         # Implementação com Supabase
-│           ├── SupabaseProfileRepository.ts
-│           └── SupabaseVacationRepository.ts
-├── pages/
-│   ├── Auth.tsx              # Página de login/registro
-│   ├── Dashboard.tsx         # Dashboard principal
-│   ├── Planning.tsx          # Planejamento de férias
-│   ├── Summary.tsx           # Resumo de saldos
-│   ├── Users.tsx             # Lista de colaboradores
-│   └── UserForm.tsx          # Formulário de colaborador
-├── supabase/
-│   ├── migrations/
-│   │   └── 001_initial_schema.sql  # Schema do banco de dados
-│   └── seed.sql              # Dados de exemplo (opcional)
-├── types/
-│   └── database.ts           # Tipos TypeScript do banco
-├── App.tsx                   # Componente raiz com AuthProvider
-├── types.ts                  # Definições TypeScript gerais
-├── constants.ts              # Constantes da aplicação
-├── geminiService.ts          # Integração com Gemini AI
-├── index.tsx                 # Ponto de entrada
-├── vite.config.ts            # Configuração do Vite
-├── vite-env.d.ts             # Tipos de variáveis de ambiente
-├── tsconfig.json             # Configuração TypeScript
-└── package.json              # Dependências
+├── pages/                  # Páginas da aplicação
+│   ├── Auth.tsx           # Autenticação e registro
+│   ├── Dashboard.tsx      # Dashboard principal
+│   ├── Planning.tsx       # Planejamento de férias
+│   ├── Summary.tsx        # Resumo de saldos
+│   ├── Users.tsx          # Lista de usuários
+│   └── UserForm.tsx       # Formulário de usuário
+├── App.tsx                # Componente raiz
+├── types.ts               # Definições TypeScript
+├── constants.ts           # Dados iniciais
+├── geminiService.ts       # Integração com Gemini AI
+├── index.tsx              # Ponto de entrada
+├── vite.config.ts         # Configuração do Vite
+├── tsconfig.json          # Configuração TypeScript
+├── package.json           # Dependências
+└── docs/                  # Documentação
+    ├── ARCHITECTURE.md    # Arquitetura do sistema
+    ├── DEVELOPMENT.md     # Guia de desenvolvimento
+    ├── COMPONENTS.md      # Documentação de componentes
+    ├── API.md             # API e tipos
+    └── USER_GUIDE.md      # Guia do usuário
 ```
 
 ## 🛠️ Tecnologias Utilizadas
@@ -182,157 +114,23 @@ holidayGo/
 | TypeScript | 5.8.2 | Superset JavaScript com tipagem estática |
 | Vite | 6.2.0 | Build tool e dev server ultrarrápido |
 | React Router | 7.11.0 | Roteamento para aplicações React |
-| **Supabase** | 2.x | Backend-as-a-Service (Auth, Database, Realtime) |
 | Google Gemini AI | 1.34.0 | Inteligência artificial para análises |
 | Tailwind CSS | - | Framework CSS utility-first (via CDN) |
 | Material Icons | - | Ícones do Material Design |
 
-## 🗄️ Banco de Dados (Supabase)
+## 📸 Screenshots
 
-### Schema
+### Dashboard - Visualização Mensal
+Interface principal com calendário mensal mostrando férias agendadas por colaborador.
 
-O banco de dados possui duas tabelas principais:
+### Dashboard - Visualização Anual
+Visão consolidada do ano completo com totais por mês e colaborador.
 
-#### Tabela `profiles` (Colaboradores)
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID do usuário (referência auth.users) |
-| email | TEXT | Email do colaborador |
-| name | TEXT | Nome completo |
-| role | TEXT | Cargo |
-| department | TEXT | Departamento |
-| hire_date | DATE | Data de contratação |
-| status | TEXT | Status (Ativo, Inativo, Férias, Pendente) |
-| vacation_balance | INT | Dias de férias disponíveis |
-| vacation_used | INT | Dias de férias utilizados |
-| created_at | TIMESTAMP | Data de criação |
-| updated_at | TIMESTAMP | Data de atualização |
+### Planejamento de Férias
+Calendário interativo para seleção de dias de férias com preview em tempo real.
 
-#### Tabela `vacations` (Férias)
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | UUID | ID único |
-| user_id | UUID | Referência ao colaborador |
-| vacation_date | DATE | Data da féria |
-| year | INT | Ano |
-| month | INT | Mês (1-12) |
-| day | INT | Dia |
-| status | TEXT | Status (planned, approved, taken, cancelled) |
-| notes | TEXT | Observações |
-| created_at | TIMESTAMP | Data de criação |
-
-### Row Level Security (RLS)
-
-O banco implementa políticas de segurança a nível de linha:
-- Usuários autenticados podem visualizar todos os perfis e férias
-- Usuários só podem modificar seus próprios dados
-- Triggers automáticos para criar perfil no registro e atualizar contagens
-
-## 🔐 Autenticação
-
-### Fluxo de Autenticação
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Login/     │────▶│   Supabase   │────▶│   Session    │
-│   Register   │     │     Auth     │     │   Created    │
-└──────────────┘     └──────────────┘     └──────────────┘
-                                                 │
-                                                 ▼
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Protected  │◀────│   AuthContext│◀────│   Profile    │
-│   Routes     │     │   Provider   │     │   Fetched    │
-└──────────────┘     └──────────────┘     └──────────────┘
-```
-
-### Usando o Hook useAuth
-
-```typescript
-import { useAuth } from './contexts/AuthContext';
-
-function MyComponent() {
-  const { 
-    user, 
-    profile,
-    signIn, 
-    signUp,
-    signOut, 
-    resetPassword,
-    updatePassword,
-    loading,
-    initialized 
-  } = useAuth();
-
-  const handleLogin = async () => {
-    const { error } = await signIn('email@example.com', 'password');
-    if (error) {
-      console.error('Login failed:', error.message);
-    }
-  };
-
-  const handleResetPassword = async (email: string) => {
-    const { error } = await resetPassword(email);
-    if (error) {
-      console.error('Reset failed:', error.message);
-    } else {
-      console.log('Email de recuperação enviado!');
-    }
-  };
-
-  const handleUpdatePassword = async (newPassword: string) => {
-    const { error } = await updatePassword(newPassword);
-    if (error) {
-      console.error('Update failed:', error.message);
-    }
-  };
-
-  if (!initialized) {
-    return <div>Verificando autenticação...</div>;
-  }
-
-  return (
-    <div>
-      {user ? (
-        <>
-          <p>Bem-vindo, {profile?.name || user.email}!</p>
-          <button onClick={signOut}>Logout</button>
-        </>
-      ) : (
-        <button onClick={handleLogin}>Login</button>
-      )}
-    </div>
-  );
-}
-```
-
-## 📊 Hooks Personalizados
-
-### useProfiles
-```typescript
-const { 
-  profiles,           // Lista de colaboradores
-  loading,            // Estado de carregamento
-  error,              // Mensagem de erro
-  fetchProfiles,      // Recarregar lista
-  getProfile,         // Buscar por ID
-  createProfile,      // Criar novo
-  updateProfile,      // Atualizar existente
-  deleteProfile       // Remover
-} = useProfiles();
-```
-
-### useVacations
-```typescript
-const {
-  vacations,          // Lista de férias
-  loading,            // Estado de carregamento
-  error,              // Mensagem de erro
-  getVacationDays,    // Dias de férias de um usuário/mês
-  toggleVacationDay,  // Adicionar/remover dia
-  addVacationDays,    // Adicionar múltiplos dias
-  removeVacationDays  // Remover múltiplos dias
-} = useVacations();
-```
+### Gestão de Colaboradores
+Lista completa de usuários com status, saldos e ações rápidas.
 
 ## 🔑 Funcionalidades Detalhadas
 
@@ -342,9 +140,7 @@ const {
 - Indicadores visuais de férias confirmadas
 - Destaque de finais de semana
 - Estatísticas de média mensal e picos de ausência
-- **Análise de Disponibilidade com IA** - Respeita filtros de visualização (mensal/anual)
-  - Modo mensal: analisa apenas o mês selecionado
-  - Modo anual: analisa todo o ano com identificação de períodos críticos
+- Botão para gerar resumo com IA
 - Exportação de relatórios (PDF/Excel)
 
 ### Planejamento
@@ -352,7 +148,6 @@ const {
 - Seleção múltipla de dias
 - Preview de saldo restante
 - Sidebar com lista de colaboradores
-- **Salvamento automático no Supabase**
 - Indicação visual de finais de semana
 - Contador de dias programados
 
@@ -368,63 +163,63 @@ const {
 - Listagem com avatar, nome, email e cargo
 - Badges de status coloridos
 - Barra de progresso de saldo de férias
-- **Persistência em banco de dados**
 - Ações de editar e excluir
 - Formulário completo para adicionar/editar
 - Validações de campos obrigatórios
 
 ### Autenticação
-- **Login com Supabase Auth**
-- **Registro de novos usuários**
-- **Recuperação de senha** - Envio de email e redefinição via link
-- **Verificação de sessão inicial** - Mantém usuário logado ao recarregar
+- Tela de login com email e senha
+- Formulário de registro
 - Design split-screen moderno
 - Animações suaves
 - Validação de formulários
-- **Proteção automática de rotas**
 
 ## 🤖 Integração com IA
 
-O sistema utiliza o **Google Gemini AI** para gerar resumos executivos inteligentes sobre a disponibilidade da equipe. A análise **respeita os filtros de visualização** selecionados:
+O sistema utiliza o **Google Gemini AI** para gerar resumos executivos inteligentes sobre a disponibilidade da equipe. A IA analisa:
 
-- **Modo Mensal**: Analisa apenas o mês selecionado
-  - Dias específicos de férias
-  - Riscos de sobrecarga no período mensal
-  - Recomendações operacionais
-
-- **Modo Anual**: Analisa todo o ano selecionado
-  - Distribuição de férias ao longo dos 12 meses
-  - Períodos críticos com alta concentração de ausências
-  - Recomendações estratégicas para distribuição equilibrada
-
-A IA analisa:
-- Status de férias de todos os colaboradores no período selecionado
+- Status de férias de todos os colaboradores
 - Quantidade de ausências programadas
 - Riscos de sobrecarga operacional
 - Recomendações para gestores de RH
+
+Exemplo de prompt utilizado:
+```typescript
+const teamContext = users.map(u => 
+  `- ${u.name} (${u.role}): Status ${u.status}, 
+   Férias este mês: ${u.plannedVacations.join(',')}`
+).join('\n');
+```
+
+## 📚 Documentação Adicional
+
+- **[Arquitetura](docs/ARCHITECTURE.md)** - Diagramas, fluxos e padrões de design
+- **[Desenvolvimento](docs/DEVELOPMENT.md)** - Guia completo para desenvolvedores
+- **[Componentes](docs/COMPONENTS.md)** - Documentação detalhada de todos os componentes
+- **[API e Tipos](docs/API.md)** - Interfaces TypeScript e serviços
+- **[Guia do Usuário](docs/USER_GUIDE.md)** - Manual de uso da aplicação
+
+## 🎨 Sistema de Design
+
+O holidayGo utiliza uma paleta de cores consistente e moderna:
+
+- **Primary**: Azul vibrante para ações principais
+- **Surface Dark**: Fundo escuro para dark mode
+- **Slate**: Escala de cinzas para textos e bordas
+- **Semântico**: Verde (sucesso), Amarelo (atenção), Vermelho (crítico)
+
+Tipografia:
+- **Font Display**: Para títulos e destaques
+- **Font Sans**: Para corpo de texto
 
 ## 🔧 Configuração Avançada
 
 ### Variáveis de Ambiente
 
 ```env
-# Supabase (obrigatório para autenticação)
-VITE_SUPABASE_URL=https://seu-projeto.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...sua_chave_anon
-
-# Google Gemini AI (opcional, para resumos IA)
-GEMINI_API_KEY=AIza...sua_chave_api
-
-# Modo Mock (opcional - desabilita Supabase para dados)
-VITE_USE_MOCK_DATA=true  # true = mock, false = Supabase
+# API do Google Gemini
+GEMINI_API_KEY=your_api_key_here
 ```
-
-| Variável | Obrigatória | Descrição |
-|----------|-------------|-----------|
-| `VITE_SUPABASE_URL` | ✅ | URL do projeto Supabase |
-| `VITE_SUPABASE_ANON_KEY` | ✅ | Chave anônima do Supabase |
-| `GEMINI_API_KEY` | ❌ | Chave API do Google Gemini |
-| `VITE_USE_MOCK_DATA` | ❌ | `true` para modo mock, `false` para Supabase |
 
 ### Portas e Host
 
@@ -443,24 +238,6 @@ server: {
 
 ## 🐛 Troubleshooting
 
-### Problema: Tela de carregamento infinita
-
-**Solução**: Verifique se as variáveis de ambiente do Supabase estão configuradas corretamente no `.env.local` e reinicie o servidor Vite.
-
-### Problema: Erro de autenticação
-
-**Solução**: 
-1. Verifique se o Email Auth está habilitado no Supabase Dashboard
-2. Confirme que a URL e chave anon estão corretas
-3. Verifique o console do navegador para erros detalhados
-
-### Problema: Dados não aparecem
-
-**Solução**: 
-1. Verifique se executou o script SQL no Supabase
-2. Confirme que as políticas RLS estão configuradas
-3. Verifique se está autenticado na aplicação
-
 ### Problema: Erro ao conectar com Gemini AI
 
 **Solução**: Verifique se a chave API está corretamente configurada no arquivo `.env.local`
@@ -472,18 +249,6 @@ server: {
 ### Problema: Módulos não encontrados
 
 **Solução**: Execute `npm install` novamente
-
-## 📚 Documentação
-
-Documentação completa disponível na pasta `docs/`:
-
-| Documento | Descrição |
-|-----------|-----------|
-| [📐 ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema, diagramas e fluxos de dados |
-| [💻 DEVELOPMENT.md](docs/DEVELOPMENT.md) | Guia de desenvolvimento e configuração do ambiente |
-| [🧩 COMPONENTS.md](docs/COMPONENTS.md) | Documentação detalhada de todos os componentes |
-| [📖 API.md](docs/API.md) | Referência de tipos TypeScript e serviços |
-| [📘 USER_GUIDE.md](docs/USER_GUIDE.md) | Manual de uso da aplicação para usuários finais |
 
 ## 🤝 Contribuindo
 
@@ -501,7 +266,7 @@ Este projeto foi criado no Google AI Studio e é distribuído para fins educacio
 
 ## 🔗 Links Úteis
 
-- [Supabase Documentation](https://supabase.com/docs)
+- [Aplicação no AI Studio](https://ai.studio/apps/drive/1-_lWbrZNvJuJkGRdIzXDOITrJBDdBX1I)
 - [Documentação do React 19](https://react.dev/)
 - [Google Gemini AI](https://ai.google.dev/)
 - [Vite Documentation](https://vitejs.dev/)
@@ -509,7 +274,7 @@ Este projeto foi criado no Google AI Studio e é distribuído para fins educacio
 
 ## 👨‍💻 Autor
 
-Desenvolvido como prova de conceito para demonstrar integração de React com Supabase e Google Gemini AI.
+Desenvolvido como prova de conceito para demonstrar integração de React com Google Gemini AI.
 
 ---
 
@@ -517,6 +282,6 @@ Desenvolvido como prova de conceito para demonstrar integração de React com Su
 
 **[⬆ Voltar ao topo](#-holidaygo---sistema-de-gestão-de-férias)**
 
-Feito com ❤️ usando React, Supabase e Google Gemini AI
+Feito com ❤️ usando React e Google Gemini AI
 
 </div>

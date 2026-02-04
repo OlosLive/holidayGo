@@ -6,12 +6,9 @@ Este documento descreve a arquitetura técnica, padrões de design e fluxos de d
 
 - [Visão Geral](#visão-geral)
 - [Arquitetura de Componentes](#arquitetura-de-componentes)
-- [Repository Pattern e Camada de Dados](#repository-pattern-e-camada-de-dados)
-- [Integração com Supabase](#integração-com-supabase)
 - [Fluxo de Dados](#fluxo-de-dados)
 - [Gerenciamento de Estado](#gerenciamento-de-estado)
 - [Sistema de Roteamento](#sistema-de-roteamento)
-- [Autenticação](#autenticação)
 - [Integração com IA](#integração-com-ia)
 - [Tema e Estilização](#tema-e-estilização)
 - [Padrões de Design](#padrões-de-design)
@@ -20,7 +17,7 @@ Este documento descreve a arquitetura técnica, padrões de design e fluxos de d
 
 ## Visão Geral
 
-O holidayGo é uma **Single Page Application (SPA)** construída com React 19 e TypeScript. A aplicação segue uma arquitetura baseada em componentes funcionais com hooks, utilizando **Supabase** como backend (autenticação, banco de dados e real-time) e React Router para navegação.
+O holidayGo é uma **Single Page Application (SPA)** construída com React 19 e TypeScript. A aplicação segue uma arquitetura baseada em componentes funcionais com hooks, utilizando React Router para navegação e gerenciamento de estado local no componente raiz.
 
 ### Stack Tecnológico
 
@@ -38,12 +35,6 @@ graph TB
         Icons[Material Icons]
     end
     
-    subgraph Backend[Backend - Supabase]
-        Auth[Supabase Auth]
-        DB[PostgreSQL]
-        Realtime[Supabase Realtime]
-    end
-    
     subgraph External[Serviços Externos]
         Gemini[Google Gemini AI]
     end
@@ -53,20 +44,16 @@ graph TB
     TS --> Vite
     React --> Tailwind
     React --> Icons
-    React --> Auth
-    React --> DB
-    React --> Realtime
     React --> Gemini
 ```
 
 ### Princípios Arquiteturais
 
-1. **Componentes Funcionais**: Utilização exclusiva de React Hooks (useState, useEffect, useMemo, useCallback)
+1. **Componentes Funcionais**: Utilização exclusiva de React Hooks (useState, useEffect, useMemo)
 2. **Tipagem Forte**: TypeScript em toda a aplicação para segurança de tipos
-3. **Context API**: AuthContext para gerenciamento de autenticação
-4. **Custom Hooks**: Lógica de dados encapsulada em hooks (useProfiles, useVacations)
-5. **Separação de Responsabilidades**: Lógica de negócio separada da apresentação
-6. **Design Responsivo**: Mobile-first com breakpoints para tablet e desktop
+3. **Prop Drilling**: Passagem de props do componente raiz para páginas filhas
+4. **Separação de Responsabilidades**: Lógica de negócio separada da apresentação
+5. **Design Responsivo**: Mobile-first com breakpoints para tablet e desktop
 
 ---
 
@@ -79,31 +66,29 @@ graph TD
     Root[index.tsx]
     Root --> App[App.tsx]
     
-    App --> AuthProvider[AuthProvider]
-    AuthProvider --> Router[HashRouter]
-    
+    App --> Router[HashRouter]
     Router --> Navbar[Navbar Component]
     Router --> Routes[Routes]
     Router --> Footer[Footer]
     
     Routes --> Auth[Auth Page]
-    Routes --> Protected[ProtectedRoute]
+    Routes --> Dashboard[Dashboard Page]
+    Routes --> Planning[Planning Page]
+    Routes --> Summary[Summary Page]
+    Routes --> Users[Users Page]
+    Routes --> UserForm[UserForm Page]
     
-    Protected --> Dashboard[Dashboard Page]
-    Protected --> Planning[Planning Page]
-    Protected --> Summary[Summary Page]
-    Protected --> Users[Users Page]
-    Protected --> UserForm[UserForm Page]
+    Dashboard --> StatusBadge1[Cards & Tables]
+    Users --> StatusBadge2[StatusBadge]
     
-    Dashboard --> useProfiles[useProfiles Hook]
-    Dashboard --> useVacations[useVacations Hook]
-    Planning --> useProfiles
-    Planning --> useVacations
-    
-    style AuthProvider fill:#3ECF8E
-    style Protected fill:#f3e5f5
-    style useProfiles fill:#e3f2fd
-    style useVacations fill:#e3f2fd
+    style App fill:#e3f2fd
+    style Routes fill:#f3e5f5
+    style Auth fill:#fff3e0
+    style Dashboard fill:#fff3e0
+    style Planning fill:#fff3e0
+    style Summary fill:#fff3e0
+    style Users fill:#fff3e0
+    style UserForm fill:#fff3e0
 ```
 
 ### Estrutura de Arquivos
@@ -111,374 +96,111 @@ graph TD
 ```
 holidayGo/
 ├── index.tsx              # Ponto de entrada React
-├── App.tsx                # Componente raiz com AuthProvider
-│
-├── lib/                   # Bibliotecas e clientes
-│   └── supabaseClient.ts  # Cliente Supabase configurado
-│
-├── contexts/              # Contextos React
-│   └── AuthContext.tsx    # Contexto de autenticação
-│
-├── hooks/                 # Hooks personalizados
-│   ├── useAuth.ts         # Hook de autenticação
-│   ├── useProfiles.ts     # CRUD de colaboradores
-│   └── useVacations.ts    # Gestão de férias
-│
-├── components/            # Componentes reutilizáveis
-│   └── ProtectedRoute.tsx # Proteção de rotas
+├── App.tsx                # Componente raiz com estado global
 │
 ├── pages/                 # Páginas da aplicação
-│   ├── Auth.tsx           # Autenticação (login/registro)
-│   ├── Dashboard.tsx      # Dashboard com calendários
-│   ├── Planning.tsx       # Planejamento de férias
-│   ├── Summary.tsx        # Resumo de saldos
-│   ├── Users.tsx          # Listagem de usuários
-│   └── UserForm.tsx       # Formulário CRUD usuário
+│   ├── Auth.tsx          # Autenticação (login/registro)
+│   ├── Dashboard.tsx     # Dashboard com calendários
+│   ├── Planning.tsx      # Planejamento de férias
+│   ├── Summary.tsx       # Resumo de saldos
+│   ├── Users.tsx         # Listagem de usuários
+│   └── UserForm.tsx      # Formulário CRUD usuário
 │
-├── types/                 # Definições TypeScript
-│   └── database.ts        # Tipos do banco Supabase
+├── types.ts              # Definições TypeScript
+├── constants.ts          # Dados mockados iniciais
+├── geminiService.ts      # Serviço de IA
 │
-├── supabase/              # Configurações Supabase
-│   ├── migrations/
-│   │   └── 001_initial_schema.sql
-│   └── seed.sql
-│
-├── types.ts               # Tipos gerais
-├── geminiService.ts       # Serviço de IA
-└── vite.config.ts         # Configuração build
-```
-
----
-
-## Repository Pattern e Camada de Dados
-
-O holidayGo implementa o **Repository Pattern** para abstrair a fonte de dados. Isso permite alternar entre dados mockados (localStorage) e Supabase sem modificar a lógica de negócio.
-
-### Arquitetura da Camada de Dados
-
-```mermaid
-graph TB
-    subgraph UI[Interface do Usuário]
-        Dashboard[Dashboard]
-        Planning[Planning]
-        Summary[Summary]
-    end
-    
-    subgraph Hooks[Custom Hooks]
-        useProfiles[useProfiles]
-        useVacations[useVacations]
-    end
-    
-    subgraph Factory[Repository Factory]
-        getProfileRepo[getProfileRepository]
-        getVacationRepo[getVacationRepository]
-    end
-    
-    subgraph Config[Configuração]
-        useMockData{VITE_USE_MOCK_DATA}
-    end
-    
-    subgraph Repositories[Repositórios]
-        subgraph Mock[Mock - localStorage]
-            MockProfile[MockProfileRepository]
-            MockVacation[MockVacationRepository]
-        end
-        subgraph Supabase[Supabase - Cloud]
-            SupaProfile[SupabaseProfileRepository]
-            SupaVacation[SupabaseVacationRepository]
-        end
-    end
-    
-    Dashboard --> useProfiles
-    Planning --> useProfiles
-    Planning --> useVacations
-    Summary --> useProfiles
-    Summary --> useVacations
-    
-    useProfiles --> getProfileRepo
-    useVacations --> getVacationRepo
-    
-    getProfileRepo --> useMockData
-    getVacationRepo --> useMockData
-    
-    useMockData -->|true| MockProfile
-    useMockData -->|true| MockVacation
-    useMockData -->|false| SupaProfile
-    useMockData -->|false| SupaVacation
-    
-    style useMockData fill:#ffd700
-    style Mock fill:#90EE90
-    style Supabase fill:#3ECF8E
-```
-
-### Interfaces dos Repositórios
-
-```typescript
-// lib/repositories/interfaces.ts
-export interface IProfileRepository {
-  fetchProfiles(): Promise<{ data: Profile[] | null; error: string | null }>;
-  getProfile(id: string): Promise<{ data: Profile | null; error: string | null }>;
-  createProfile(profile: ProfileInsert): Promise<{ data: Profile | null; error: string | null }>;
-  updateProfile(id: string, updates: ProfileUpdate): Promise<{ error: string | null }>;
-  deleteProfile(id: string): Promise<{ error: string | null }>;
-}
-
-export interface IVacationRepository {
-  fetchAllVacations(): Promise<{ data: Vacation[] | null; error: string | null }>;
-  getVacationDays(userId: string, year: number, month: number): number[];
-  toggleVacationDay(userId: string, year: number, month: number, day: number): Promise<{ error: string | null }>;
-  // ...
-}
-```
-
-### Fluxo de Decisão
-
-```mermaid
-flowchart TD
-    Start[Hook solicita dados] --> Check{config.useMockData?}
-    Check -->|true| Mock[MockRepository]
-    Check -->|false| Supa[SupabaseRepository]
-    Mock --> LocalStorage[(localStorage)]
-    Supa --> Cloud[(Supabase Cloud)]
-    LocalStorage --> Return[Retorna dados]
-    Cloud --> Return
-```
-
-### Benefícios
-
-| Benefício | Descrição |
-|-----------|-----------|
-| **Desenvolvimento Offline** | Funciona sem conexão ao Supabase |
-| **Testes Isolados** | Mock não afeta dados reais |
-| **Prototipagem Rápida** | Dados fictícios pré-configurados |
-| **Demonstrações** | Ambiente controlado para apresentações |
-| **Inversão de Dependência** | Hooks não dependem de implementação específica |
-
----
-
-## Integração com Supabase
-
-### Arquitetura do Backend
-
-```mermaid
-graph LR
-    subgraph App[Aplicação React]
-        Client[Supabase Client]
-        AuthCtx[AuthContext]
-        Hooks[Custom Hooks]
-    end
-    
-    subgraph Supabase[Supabase Cloud]
-        Auth[Auth Service]
-        PostgREST[PostgREST API]
-        Realtime[Realtime Server]
-        DB[(PostgreSQL)]
-    end
-    
-    Client --> Auth
-    Client --> PostgREST
-    Client --> Realtime
-    
-    Auth --> DB
-    PostgREST --> DB
-    Realtime --> DB
-    
-    AuthCtx --> Client
-    Hooks --> Client
-```
-
-### Schema do Banco de Dados
-
-```mermaid
-erDiagram
-    auth_users ||--o| profiles : "has one"
-    profiles ||--o{ vacations : "has many"
-    
-    profiles {
-        uuid id PK
-        text email
-        text name
-        text role
-        text department
-        date hire_date
-        text status
-        int vacation_balance
-        int vacation_used
-        timestamp created_at
-        timestamp updated_at
-    }
-    
-    vacations {
-        uuid id PK
-        uuid user_id FK
-        date vacation_date
-        int year
-        int month
-        int day
-        text status
-        text notes
-        timestamp created_at
-    }
-```
-
-### Row Level Security (RLS)
-
-```sql
--- Políticas de segurança
--- Profiles: Visualização para usuários autenticados
-CREATE POLICY "profiles_select_authenticated" ON profiles
-    FOR SELECT TO authenticated USING (true);
-
--- Profiles: Atualização apenas do próprio perfil
-CREATE POLICY "profiles_update_own" ON profiles
-    FOR UPDATE TO authenticated USING (auth.uid() = id);
-
--- Vacations: Visualização para usuários autenticados
-CREATE POLICY "vacations_select_authenticated" ON vacations
-    FOR SELECT TO authenticated USING (true);
-
--- Vacations: CRUD apenas das próprias férias
-CREATE POLICY "vacations_all_own" ON vacations
-    FOR ALL TO authenticated USING (auth.uid() = user_id);
-```
-
-### Cliente Supabase
-
-```typescript
-// lib/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/database';
-
-export const supabase = createClient<Database>(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY,
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-    },
-  }
-);
+└── vite.config.ts        # Configuração build
 ```
 
 ---
 
 ## Fluxo de Dados
 
-### Fluxo com Supabase
+### Fluxo Unidirecional
 
-O holidayGo utiliza um fluxo de dados **reativo** onde os custom hooks se conectam ao Supabase e fornecem dados aos componentes.
+O holidayGo utiliza um fluxo de dados **top-down** (unidirecional) onde o estado é gerenciado no componente `App` e passado como props para os componentes filhos.
 
 ```mermaid
-graph TD
-    subgraph UI[Interface do Usuário]
-        Dashboard[Dashboard]
-        Planning[Planning]
-        Users[Users Page]
+graph LR
+    subgraph AppComponent[App Component]
+        State[Estado Global]
+        Users[users: User array]
+        Theme[isDarkMode: boolean]
     end
     
-    subgraph Hooks[Custom Hooks]
-        useProfiles[useProfiles]
-        useVacations[useVacations]
-        useAuth[useAuth]
-    end
+    State --> Users
+    State --> Theme
     
-    subgraph Supabase[Supabase]
-        DB[(Database)]
-        Realtime[Realtime Channel]
-    end
+    Users -->|props| Dashboard[Dashboard]
+    Users -->|props| Planning[Planning]
+    Users -->|props| Summary[Summary]
+    Users -->|props| UsersPage[Users Page]
+    Users -->|props| UserForm[User Form]
     
-    Dashboard --> useProfiles
-    Dashboard --> useVacations
-    Planning --> useProfiles
-    Planning --> useVacations
-    Users --> useProfiles
+    Theme -->|props| Navbar[Navbar]
     
-    useProfiles --> DB
-    useVacations --> DB
-    useAuth --> DB
-    
-    Realtime --> useProfiles
-    Realtime --> useVacations
+    Planning -->|onUpdate callback| State
+    UsersPage -->|onDelete callback| State
+    UserForm -->|onSave callback| State
 ```
 
 ### Ciclo de Vida dos Dados
 
-1. **Inicialização**: Hooks carregam dados do Supabase no mount
-2. **Subscriptions**: Real-time listeners atualizam estado automaticamente
-3. **Mutação**: Operações CRUD via Supabase API
-4. **Otimistic Updates**: Estado local atualizado imediatamente
-5. **Sync**: Real-time garante consistência entre clientes
+1. **Inicialização**: Estado carregado com `INITIAL_USERS` do arquivo constants.ts
+2. **Propagação**: Props distribuídas via React Router para páginas
+3. **Mutação**: Callbacks (`onUpdate`, `onDelete`, `onSave`) modificam estado no App
+4. **Re-renderização**: React propaga mudanças para componentes dependentes
 
 ---
 
 ## Gerenciamento de Estado
 
-### AuthContext
+### Estado no Componente App
 
 ```typescript
-interface AuthState {
-  user: User | null;
-  profile: Profile | null;
-  session: Session | null;
-  loading: boolean;
-  initialized: boolean;
-  error: string | null;
-}
+const App: React.FC = () => {
+  // Estado de usuários
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  
+  // Estado de tema
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-interface AuthContextType extends AuthState {
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: AuthError | null }>;
-  signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<Profile>) => Promise<{ error: Error | null }>;
-}
+  // Funções de mutação
+  const addUser = (user: User) => setUsers([...users, user]);
+  const updateUser = (updatedUser: User) => 
+    setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+  const deleteUser = (id: string) => 
+    setUsers(users.filter(u => u.id !== id));
+};
 ```
 
-### Custom Hooks
+### Estados Locais nas Páginas
 
-```typescript
-// useProfiles - CRUD de colaboradores
-const {
-  profiles,      // Profile[]
-  loading,       // boolean
-  error,         // string | null
-  fetchProfiles, // () => Promise<void>
-  getProfile,    // (id: string) => Promise<Profile | null>
-  createProfile, // (data) => Promise<{ data, error }>
-  updateProfile, // (id, data) => Promise<{ error }>
-  deleteProfile, // (id) => Promise<{ error }>
-} = useProfiles();
+Cada página mantém seu próprio estado local para:
 
-// useVacations - Gestão de férias
-const {
-  vacations,         // Vacation[]
-  loading,           // boolean
-  error,             // string | null
-  getVacationDays,   // (userId, year, month) => number[]
-  toggleVacationDay, // (userId, year, month, day) => Promise<{ error }>
-  addVacationDays,   // (userId, year, month, days[]) => Promise<{ error }>
-  removeVacationDays,// (userId, year, month, days[]) => Promise<{ error }>
-} = useVacations();
-```
+- **Dashboard**: `viewMode`, `selectedMonth`, `selectedYear`, `aiSummary`
+- **Planning**: `selectedUserId`
+- **UserForm**: `formData` com validações
+- **Auth**: `mode` (login/register), `isLoading`
 
 ### Fluxo de Atualização
 
 ```mermaid
 sequenceDiagram
     participant User as Usuário
-    participant Page as Página
-    participant Hook as Custom Hook
-    participant Supabase as Supabase
-    participant Realtime as Realtime
+    participant Page as Página (Planning)
+    participant App as App Component
+    participant React as React Engine
     
-    User->>Page: Clica para adicionar férias
-    Page->>Hook: toggleVacationDay(...)
-    Hook->>Hook: Otimistic Update (state)
-    Hook->>Supabase: INSERT/DELETE vacation
-    Supabase->>Supabase: Atualiza DB
-    Supabase->>Realtime: Emite evento
-    Realtime->>Hook: Notifica mudança
-    Hook->>Page: Re-render com novos dados
+    User->>Page: Clica em dia para agendar férias
+    Page->>Page: Atualiza estado local (toggleDay)
+    Page->>App: Chama onUpdate(updatedUser)
+    App->>App: Atualiza users state
+    React->>React: Detecta mudança no state
+    React->>Dashboard: Re-renderiza com novos dados
+    React->>Summary: Re-renderiza com novos dados
+    React->>Planning: Re-renderiza com novos dados
 ```
 
 ---
@@ -487,125 +209,42 @@ sequenceDiagram
 
 ### Configuração do React Router
 
+O holidayGo utiliza `HashRouter` para compatibilidade com ambientes estáticos.
+
 ```typescript
 <HashRouter>
-  <AuthProvider>
-    <Navbar />
-    <Routes>
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/" element={
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
-      } />
-      <Route path="/dashboard" element={
-        <ProtectedRoute><Dashboard /></ProtectedRoute>
-      } />
-      <Route path="/planning" element={
-        <ProtectedRoute><Planning /></ProtectedRoute>
-      } />
-      <Route path="/summary" element={
-        <ProtectedRoute><Summary /></ProtectedRoute>
-      } />
-      <Route path="/users" element={
-        <ProtectedRoute><Users /></ProtectedRoute>
-      } />
-      <Route path="/users/add" element={
-        <ProtectedRoute><UserForm /></ProtectedRoute>
-      } />
-      <Route path="/users/edit/:id" element={
-        <ProtectedRoute><UserForm /></ProtectedRoute>
-      } />
-    </Routes>
-    <Footer />
-  </AuthProvider>
+  <Navbar />
+  <Routes>
+    <Route path="/" element={<Dashboard users={users} />} />
+    <Route path="/summary" element={<Summary users={users} />} />
+    <Route path="/users" element={<Users users={users} onDelete={deleteUser} />} />
+    <Route path="/planning" element={<Planning users={users} onUpdate={updateUser} />} />
+    <Route path="/users/add" element={<UserForm onSave={addUser} />} />
+    <Route path="/users/edit/:id" element={<UserForm users={users} onSave={updateUser} />} />
+    <Route path="/auth" element={<Auth />} />
+  </Routes>
+  <Footer />
 </HashRouter>
 ```
 
 ### Mapa de Rotas
 
-| Rota | Componente | Protegida | Descrição |
-|------|-----------|-----------|-----------|
-| `/auth` | Auth | ❌ | Login e registro |
-| `/` | Dashboard | ✅ | Página inicial |
-| `/dashboard` | Dashboard | ✅ | Dashboard com calendários |
-| `/planning` | Planning | ✅ | Planejamento de férias |
-| `/summary` | Summary | ✅ | Resumo e status |
-| `/users` | Users | ✅ | Lista de colaboradores |
-| `/users/add` | UserForm | ✅ | Adicionar usuário |
-| `/users/edit/:id` | UserForm | ✅ | Editar usuário |
+| Rota | Componente | Descrição | Props |
+|------|-----------|-----------|-------|
+| `/` | Dashboard | Página inicial com calendários | `users` |
+| `/auth` | Auth | Login e registro | - |
+| `/planning` | Planning | Planejamento de férias | `users`, `onUpdate` |
+| `/summary` | Summary | Resumo e status | `users` |
+| `/users` | Users | Lista de colaboradores | `users`, `onDelete` |
+| `/users/add` | UserForm | Adicionar usuário | `onSave` |
+| `/users/edit/:id` | UserForm | Editar usuário | `users`, `onSave` |
 
----
+### Navegação Condicional
 
-## Autenticação
-
-### Fluxo de Autenticação
-
-#### Login
-
-```mermaid
-sequenceDiagram
-    participant User as Usuário
-    participant Auth as Auth Page
-    participant Context as AuthContext
-    participant Supabase as Supabase Auth
-    participant DB as Database
-    
-    User->>Auth: Preenche formulário
-    Auth->>Context: signIn(email, password)
-    Context->>Supabase: signInWithPassword()
-    Supabase->>Supabase: Valida credenciais
-    Supabase->>Context: Emite SIGNED_IN event
-    Context->>Context: Atualiza state (user, session)
-    Context->>DB: Busca profile
-    DB->>Context: Retorna profile
-    Context->>Auth: Re-render (user != null)
-    Auth->>Auth: navigate('/dashboard')
-```
-
-#### Recuperação de Senha
-
-```mermaid
-sequenceDiagram
-    participant User as Usuário
-    participant Auth as Auth Page
-    participant Context as AuthContext
-    participant Supabase as Supabase Auth
-    participant Email as Email Service
-    
-    User->>Auth: Clica "Esqueceu a senha?"
-    Auth->>Auth: Abre modal
-    User->>Auth: Informa email
-    Auth->>Context: resetPassword(email)
-    Context->>Supabase: resetPasswordForEmail()
-    Supabase->>Email: Envia email com link
-    Email->>User: Link de recuperação
-    User->>Auth: Clica no link
-    Auth->>Auth: Detecta ?recovery=true
-    Auth->>Supabase: setSession(recoveryToken)
-    Supabase->>Auth: Sessão de recuperação
-    User->>Auth: Informa nova senha
-    Auth->>Context: updatePassword(newPassword)
-    Context->>Supabase: updateUser({ password })
-    Supabase->>Context: Senha atualizada
-    Auth->>Auth: navigate('/dashboard')
-```
-
-### ProtectedRoute
+A Navbar é ocultada na rota `/auth`:
 
 ```typescript
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, initialized } = useAuth();
-  const location = useLocation();
-
-  if (!initialized) {
-    return <LoadingSpinner />;
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
-  }
-
-  return <>{children}</>;
-};
+if (location.pathname === '/auth') return null;
 ```
 
 ---
@@ -617,7 +256,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 ```mermaid
 graph LR
     Dashboard[Dashboard Component] -->|Clique no botão| Handler[handleGetAiSummary]
-    Handler -->|profiles + vacations| Service[geminiService.ts]
+    Handler -->|await| Service[geminiService.ts]
     Service -->|API Request| Gemini[Google Gemini AI]
     Gemini -->|Response| Service
     Service -->|text| Handler
@@ -629,41 +268,26 @@ graph LR
 
 ```typescript
 // geminiService.ts
-export const generateTeamSummary = async (
-  users: User[], 
-  viewMode: 'mensal' | 'anual' = 'mensal',
-  selectedMonth?: number,
-  selectedYear?: number
-): Promise<string> => {
+export const generateTeamSummary = async (users: User[]): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
   
-  // Formatar contexto baseado no modo de visualização
-  const teamContext = users.map(u => {
-    if (viewMode === 'mensal' && selectedMonth !== undefined) {
-      // Modo mensal: mostrar dias específicos do mês
-      const monthName = months[selectedMonth];
-      return `- ${u.name} (${u.role}): Status ${u.status}, Férias em ${monthName}: ${u.plannedVacations.join(', ') || 'Nenhuma'}`;
-    } else {
-      // Modo anual: mostrar férias organizadas por mês
-      // Decodificar formato: mês*1000 + dia
-      const annualData = /* processar dados anuais */;
-      return `- ${u.name} (${u.role}): Status ${u.status}, Férias no ano: ${formatAnnualVacations(annualData)}`;
-    }
-  }).join('\n');
+  // Contexto formatado
+  const teamContext = users.map(u => 
+    `- ${u.name} (${u.role}): Status ${u.status}, 
+     Férias este mês: ${u.plannedVacations.length > 0 
+       ? u.plannedVacations.join(',') : 'Nenhuma'}`
+  ).join('\n');
 
-  const periodContext = viewMode === 'mensal' 
-    ? `${months[selectedMonth]} de ${selectedYear}`
-    : `ano de ${selectedYear}`;
-
+  // Prompt estruturado
   const prompt = `
-    Abaixo está uma lista da equipe e seus status de férias para o ${periodContext}. 
+    Abaixo está uma lista da equipe e seus status de férias. 
     Gere um resumo executivo curto (máximo 150 palavras) em Português do Brasil.
-    ${viewMode === 'anual' ? 'Analise a distribuição de férias ao longo do ano e identifique períodos críticos.' : ''}
     
     Equipe:
     ${teamContext}
   `;
 
+  // Chamada à API
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
@@ -673,28 +297,27 @@ export const generateTeamSummary = async (
 };
 ```
 
-### Fluxo de Análise de Disponibilidade
+### Fluxo de Análise de IA
 
 ```mermaid
 sequenceDiagram
-    participant User as Usuário
-    participant Dashboard as Dashboard
-    participant Handler as handleGetAiSummary
-    participant Service as geminiService
-    participant Gemini as Google Gemini AI
+    participant U as Usuário
+    participant D as Dashboard
+    participant S as geminiService
+    participant G as Gemini API
     
-    User->>Dashboard: Seleciona período (mensal/anual)
-    User->>Dashboard: Clica "Pedir Resumo IA"
-    Dashboard->>Handler: viewMode, selectedMonth, selectedYear
-    Handler->>Handler: Coleta dados do período
-    Note over Handler: Modo mensal: apenas mês selecionado<br/>Modo anual: todos os 12 meses
-    Handler->>Service: generateTeamSummary(users, viewMode, month, year)
-    Service->>Service: Formata contexto baseado no modo
-    Service->>Gemini: API Request com prompt contextualizado
-    Gemini->>Service: Resposta com análise
-    Service->>Handler: Texto do resumo
-    Handler->>Dashboard: setAiSummary(summary)
-    Dashboard->>User: Exibe análise do período selecionado
+    U->>D: Clica "Pedir Resumo IA"
+    D->>D: setIsLoadingSummary(true)
+    D->>S: generateTeamSummary(users)
+    S->>S: Formata contexto da equipe
+    S->>S: Cria prompt estruturado
+    S->>G: POST /generateContent
+    G->>G: Processa com LLM
+    G->>S: Retorna texto gerado
+    S->>D: Retorna string de resumo
+    D->>D: setAiSummary(summary)
+    D->>D: setIsLoadingSummary(false)
+    D->>U: Exibe resumo na interface
 ```
 
 ---
@@ -710,6 +333,20 @@ graph TD
     State -->|useEffect| DOM[document.documentElement]
     DOM -->|add/remove| Class[class 'dark']
     Class -->|CSS| Styles[Tailwind Dark Variants]
+```
+
+### Implementação
+
+```typescript
+const [isDarkMode, setIsDarkMode] = useState(false);
+
+useEffect(() => {
+  if (isDarkMode) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
+}, [isDarkMode]);
 ```
 
 ### Paleta de Cores
@@ -732,87 +369,191 @@ graph TD
 --primary: blue-500
 ```
 
+### Convenções Tailwind
+
+- `dark:bg-surface-dark` - Fundo de cards no dark mode
+- `dark:text-white` - Texto principal
+- `dark:border-slate-800` - Bordas
+- `dark:hover:bg-slate-800` - Estados de hover
+
 ---
 
 ## Padrões de Design
 
-### 1. Repository Pattern
-
-Abstrai a fonte de dados, permitindo alternar entre implementações:
-
-```typescript
-// Interface define contrato
-interface IProfileRepository {
-  fetchProfiles(): Promise<{ data: Profile[] | null; error: string | null }>;
-}
-
-// Implementações diferentes
-class MockProfileRepository implements IProfileRepository { ... }
-class SupabaseProfileRepository implements IProfileRepository { ... }
-
-// Factory decide qual usar
-const repository = config.useMockData 
-  ? new MockProfileRepository() 
-  : new SupabaseProfileRepository();
-```
-
-### 2. Container/Presentational Pattern
+### 1. Container/Presentational Pattern
 
 **Container (Smart Component)**
 - Gerencia estado e lógica
-- Conecta-se a hooks
-- Exemplo: `Dashboard.tsx`, `Planning.tsx`
+- Exemplo: `App.tsx`, `Dashboard.tsx`
 
 **Presentational (Dumb Component)**
 - Apenas renderiza UI
 - Exemplo: `StatusBadge`, `Navbar`, `Footer`
 
+### 2. Compound Components
+
+A Navbar é um componente composto dentro do App:
+
+```typescript
+const Navbar: React.FC<{ isDarkMode: boolean, toggleTheme: () => void }> = 
+  ({ isDarkMode, toggleTheme }) => {
+  // Lógica de navegação
+};
+```
+
 ### 3. Custom Hooks Pattern
 
-Encapsula lógica de dados em hooks reutilizáveis:
+Uso de `useMemo` para otimização de cálculos:
 
 ```typescript
-// Hook encapsula toda lógica de dados
-const { profiles, loading, error, createProfile } = useProfiles();
-
-// Componente foca apenas na UI
-if (loading) return <Spinner />;
-if (error) return <Error message={error} />;
-return <ProfileList profiles={profiles} />;
+const getMonthWeekDays = useMemo(() => {
+  const daysCount = getDaysInMonth(selectedMonth, selectedYear);
+  // Cálculo pesado
+  return labels;
+}, [selectedMonth, selectedYear]);
 ```
 
-### 4. Context + Hooks Pattern
+### 4. Render Props Pattern
+
+Callbacks passadas como props:
 
 ```typescript
-// Contexto provê estado global
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Hook consome o contexto
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be within AuthProvider');
-  return context;
-};
+<Users 
+  users={users} 
+  onDelete={(id) => setUsers(users.filter(u => u.id !== id))} 
+/>
 ```
 
-### 5. Optimistic Updates
+### 5. Conditional Rendering
+
+Múltiplas estratégias:
 
 ```typescript
-const toggleVacationDay = async (userId, year, month, day) => {
-  // 1. Atualiza estado local imediatamente
-  setVacations(prev => [...prev, newVacation]);
-  
-  // 2. Persiste no banco
-  const { error } = await supabase.from('vacations').insert(newVacation);
-  
-  // 3. Reverte se houver erro
-  if (error) {
-    setVacations(prev => prev.filter(v => v.id !== newVacation.id));
-    return { error: error.message };
-  }
-  
-  return { error: null };
-};
+// Early return
+if (location.pathname === '/auth') return null;
+
+// Ternário
+{mode === 'login' ? 'Bem-vindo' : 'Cadastre-se'}
+
+// Operador &&
+{isLoading && <Spinner />}
+
+// Componente condicional
+{viewMode === 'mensal' ? <MonthView /> : <YearView />}
+```
+
+### 6. Form Controlled Components
+
+Formulários totalmente controlados:
+
+```typescript
+const [formData, setFormData] = useState<Partial<User>>({...});
+
+<input
+  value={formData.name}
+  onChange={e => setFormData({ ...formData, name: e.target.value })}
+/>
+```
+
+---
+
+## Fluxos Principais
+
+### Fluxo de Autenticação
+
+```mermaid
+graph TD
+    Start[Usuário acessa /auth] --> Form[Exibe formulário]
+    Form --> Mode{Modo?}
+    Mode -->|Login| LoginForm[Campos: email, senha]
+    Mode -->|Register| RegForm[Campos: nome, email, senha]
+    LoginForm --> Submit[handleSubmit]
+    RegForm --> Submit
+    Submit --> Loading[setIsLoading true]
+    Loading --> Simulate[Simula request 800ms]
+    Simulate --> Navigate[navigate to /]
+    Navigate --> Dashboard[Dashboard]
+```
+
+### Fluxo de Planejamento de Férias
+
+```mermaid
+graph TD
+    Start[Usuário acessa /planning] --> Select[Seleciona colaborador na sidebar]
+    Select --> Calendar[Exibe calendário do mês]
+    Calendar --> Click[Clica em um dia]
+    Click --> Toggle[toggleDay function]
+    Toggle --> Check{Dia já selecionado?}
+    Check -->|Sim| Remove[Remove do array plannedVacations]
+    Check -->|Não| Add[Adiciona ao array plannedVacations]
+    Remove --> Update[Chama onUpdate]
+    Add --> Update
+    Update --> AppState[Atualiza estado no App]
+    AppState --> Rerender[Re-renderiza Planning]
+    Rerender --> Footer[Atualiza contadores no footer]
+```
+
+### Fluxo CRUD de Usuários
+
+```mermaid
+graph TD
+    List[Users Page] --> Action{Ação}
+    
+    Action -->|Novo| Add[/users/add]
+    Action -->|Editar| Edit[/users/edit/:id]
+    Action -->|Excluir| Delete[onDelete]
+    
+    Add --> Form1[UserForm modo create]
+    Edit --> Form2[UserForm modo edit]
+    
+    Form1 --> Submit1[handleSubmit]
+    Form2 --> Submit2[handleSubmit]
+    
+    Submit1 --> Create[addUser]
+    Submit2 --> UpdateFunc[updateUser]
+    Delete --> Filter[setUsers com filter]
+    
+    Create --> Navigate1[navigate to /users]
+    UpdateFunc --> Navigate2[navigate to /users]
+    Filter --> Rerender[Re-renderiza lista]
+```
+
+---
+
+## Otimizações de Performance
+
+### 1. useMemo para Cálculos Pesados
+
+```typescript
+const getMonthWeekDays = useMemo(() => {
+  // Evita recalcular a cada render
+  return calculatedDays;
+}, [selectedMonth, selectedYear]);
+```
+
+### 2. Early Returns
+
+```typescript
+if (location.pathname === '/auth') return null;
+// Evita renderizar Navbar desnecessariamente
+```
+
+### 3. Lazy Evaluation
+
+```typescript
+const isVacation = (selectedMonth === 6 && selectedYear === 2026) 
+  && user.plannedVacations.includes(day);
+// Avaliação curto-circuito
+```
+
+### 4. Key Props em Listas
+
+```typescript
+{users.map((user) => (
+  <tr key={user.id}>
+    {/* Otimiza reconciliação do React */}
+  </tr>
+))}
 ```
 
 ---
@@ -828,21 +569,21 @@ define: {
 }
 ```
 
-- API keys nunca commitadas no código
-- Carregadas de `.env.local`
-- Injetadas em tempo de build
+- API key nunca commitada no código
+- Carregada de `.env.local`
+- Injetada em tempo de build
 
-### Row Level Security
+### Validação de Formulários
 
-- Todas as tabelas protegidas com RLS
-- Políticas granulares por operação (SELECT, INSERT, UPDATE, DELETE)
-- Autenticação via JWT verificada pelo Supabase
+- Campos `required` em todos os inputs críticos
+- Validação de tipo email nativo do HTML5
+- Prevenção de submit sem dados válidos
 
-### Validação de Dados
+### Sanitização de Dados
 
 - TypeScript garante tipagem forte
-- Validação de formulários no frontend
-- Constraints no banco de dados
+- Validação de props com interfaces
+- Conversão explícita de tipos numéricos
 
 ---
 
@@ -850,25 +591,49 @@ define: {
 
 ### Preparação para Crescimento
 
-O código atual está preparado para evoluir:
+O código atual está preparado para evoluir para:
 
-1. ✅ **Context API** - Implementado para autenticação
-2. ✅ **Custom Hooks** - Isolam lógica de dados
-3. ✅ **Backend Real** - Supabase integrado
-4. ✅ **Autenticação Real** - Supabase Auth implementado
-5. ✅ **Repository Pattern** - Abstração de fonte de dados
-6. ✅ **Modo Mock** - Desenvolvimento offline com localStorage
-7. ⏳ **Testes** - Jest, React Testing Library
-8. ⏳ **CI/CD** - GitHub Actions
+1. **Context API** - Substituir prop drilling por contextos
+2. **Redux/Zustand** - Gerenciamento de estado mais robusto
+3. **React Query** - Cache e sincronização de dados
+4. **Backend Real** - Substituir INITIAL_USERS por API REST
+5. **Autenticação Real** - JWT, OAuth, etc.
+6. **Testes** - Jest, React Testing Library, Cypress
 
 ### Pontos de Extensão
 
-- **Repository Pattern** permite trocar fonte de dados facilmente
-- Serviços isolados facilitam mocking e testes
-- Tipos TypeScript centralizados
+- Serviços isolados (geminiService.ts) facilitam mocking
+- Tipos TypeScript centralizados (types.ts)
 - Componentes desacoplados
-- Real-time pronto para colaboração multi-usuário
-- Modo mock para demonstrações e prototipagem
+- Roteamento modular
+
+---
+
+## Diagramas de Sequência Completos
+
+### Login + Dashboard + IA
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Auth
+    participant App
+    participant Dashboard
+    participant Gemini
+    
+    User->>Auth: Acessa /auth
+    Auth->>Auth: Exibe formulário
+    User->>Auth: Preenche e envia
+    Auth->>Auth: Simula autenticação
+    Auth->>App: navigate('/')
+    App->>Dashboard: Renderiza com users
+    Dashboard->>User: Exibe calendário
+    User->>Dashboard: Clica "Pedir Resumo IA"
+    Dashboard->>Gemini: generateTeamSummary(users)
+    Gemini->>Gemini: Processa com LLM
+    Gemini->>Dashboard: Retorna resumo
+    Dashboard->>User: Exibe análise
+```
 
 ---
 
@@ -880,8 +645,8 @@ A arquitetura do holidayGo prioriza:
 - ✅ **Manutenibilidade**: Código limpo e organizado
 - ✅ **Escalabilidade**: Preparado para crescer
 - ✅ **Performance**: Otimizações estratégicas
-- ✅ **Segurança**: RLS + Autenticação robusta
-- ✅ **Developer Experience**: TypeScript + Vite + Supabase
-- ✅ **Real-time**: Atualizações em tempo real
+- ✅ **Segurança**: Boas práticas aplicadas
+- ✅ **Developer Experience**: TypeScript + Vite
 
 Para mais detalhes sobre componentes específicos, consulte [COMPONENTS.md](COMPONENTS.md).
+
