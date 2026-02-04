@@ -202,10 +202,22 @@ const AppContent: React.FC = () => {
           } />
         </Routes>
       </main>
-      <footer className="bg-white dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 py-6 px-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <p className="text-slate-400 text-sm">
-            © {new Date().getFullYear()} holidayGo System. Todos os direitos reservados.
+      <footer className="bg-white dark:bg-surface-dark border-t border-slate-200 dark:border-slate-800 py-4 px-4">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-[10px] font-bold uppercase tracking-wider">
+              MVP
+            </span>
+            <span className="text-slate-400 dark:text-slate-500 text-xs">v1.0.0</span>
+          </div>
+          <span className="hidden sm:block text-slate-300 dark:text-slate-600">•</span>
+          <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 text-xs">
+            <span className="material-icons-round text-sm text-primary">verified</span>
+            Powered by Olos
+          </div>
+          <span className="hidden sm:block text-slate-300 dark:text-slate-600">•</span>
+          <p className="text-slate-400 dark:text-slate-500 text-xs">
+            © {new Date().getFullYear()} holidayGo
           </p>
         </div>
       </footer>
