@@ -143,9 +143,9 @@ const Auth: React.FC = () => {
             </h2>
             <p className="text-slate-500 dark:text-slate-400 font-medium">
               {mode === 'login' 
-                ? 'Entre na sua conta para gerenciar os agendamentos da equipe.' 
+                ? 'Acesse o sistema de gestão de férias da Olos.' 
                 : mode === 'register'
-                ? 'Comece a organizar as férias do seu time de forma inteligente.'
+                ? 'Cadastre-se para gerenciar suas férias na Olos.'
                 : 'Digite sua nova senha abaixo.'}
             </p>
           </div>
@@ -189,7 +189,7 @@ const Auth: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nome@empresa.com"
+                    placeholder="nome@olos.com.br"
                     className="w-full rounded-2xl border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 dark:text-white focus:ring-primary focus:border-primary py-3.5 pl-12 pr-4 transition-all"
                   />
                 </div>
@@ -284,12 +284,12 @@ const Auth: React.FC = () => {
               </div>
 
               <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-                {mode === 'login' ? 'Não tem uma conta ainda?' : 'Já possui uma conta?'}
+                {mode === 'login' ? 'Primeiro acesso?' : 'Já possui uma conta?'}
                 <button 
                   onClick={toggleMode}
                   className="text-primary font-black ml-2 hover:underline focus:outline-none"
                 >
-                  {mode === 'login' ? 'Cadastre-se grátis' : 'Fazer login'}
+                  {mode === 'login' ? 'Cadastre-se' : 'Fazer login'}
                 </button>
               </p>
             </div>
@@ -398,24 +398,20 @@ const Auth: React.FC = () => {
         <div className="relative z-10 flex flex-col justify-center p-12 lg:p-16 text-white w-full h-full">
           <div className="max-w-xl space-y-5">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 backdrop-blur-sm text-primary text-[10px] font-black uppercase tracking-widest">
-              Líder em Gestão de Férias
+              Olos • Gestão de Férias
             </div>
             <h2 className="text-5xl lg:text-6xl font-black leading-[1.1] tracking-tighter font-display">
               Descanso é parte do <span className="text-primary italic">sucesso.</span>
             </h2>
             <p className="text-base lg:text-lg text-slate-300 font-medium leading-relaxed max-w-md">
-              Ajudamos empresas a organizarem o tempo livre de seus colaboradores com inteligência, garantindo produtividade e bem-estar.
+              Organize suas férias de forma inteligente. Planeje seu descanso e mantenha a equipe sempre alinhada.
             </p>
             
-            <div className="pt-6 flex items-center gap-6">
-              <div className="flex -space-x-3">
-                {[1, 2, 3, 4].map(i => (
-                  <img key={i} src={`https://i.pravatar.cc/100?u=${i}`} className="h-9 w-9 rounded-full border-2 border-slate-900" alt="Usuário satisfeito" />
-                ))}
-                <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-[9px] font-bold border-2 border-slate-900">+50k</div>
+            <div className="pt-6 flex items-center gap-4">
+              <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10">
+                <span className="material-icons-round text-primary text-xl">verified</span>
+                <span className="text-sm font-medium text-white/80">Powered by Olos</span>
               </div>
-              <div className="h-9 w-[1px] bg-white/20"></div>
-              <p className="text-xs text-white/60 font-medium">Junte-se a mais de 2.000 empresas que confiam no holidayGo.</p>
             </div>
           </div>
         </div>
