@@ -520,16 +520,16 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Card 3 - Total da Equipe */}
-        <div className="group relative bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-emerald-300/50 transition-all duration-300 overflow-hidden">
-          <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-emerald-100 to-transparent dark:from-emerald-900/20 rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="group relative bg-white dark:bg-surface-dark p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-primary/30 transition-all duration-300 overflow-hidden">
+          <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="relative flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-              <span className="material-icons-round text-emerald-500 text-base">groups</span>
+            <div className="p-2 bg-primary/10 dark:bg-primary/20 rounded-lg">
+              <span className="material-icons-round text-primary text-base">groups</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Equipe</p>
               <div className="flex items-baseline gap-1.5">
-                <h3 className="text-2xl font-black text-emerald-500">{users.length}</h3>
+                <h3 className="text-2xl font-black text-primary">{users.length}</h3>
                 <span className="text-xs font-medium text-slate-400 dark:text-slate-500">colaboradores</span>
               </div>
             </div>
@@ -537,7 +537,7 @@ const Dashboard: React.FC = () => {
               {users.slice(0, 3).map((user) => (
                 <div 
                   key={user.id}
-                  className="h-6 w-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-[9px] font-bold ring-2 ring-white dark:ring-surface-dark"
+                  className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center text-white text-[9px] font-bold ring-2 ring-white dark:ring-surface-dark"
                   title={user.name}
                 >
                   {user.name.charAt(0)}
