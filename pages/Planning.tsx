@@ -56,11 +56,11 @@ const Planning: React.FC = () => {
     return new Date(selectedYear, selectedMonth + 1, 0).getDate();
   }, [selectedMonth, selectedYear]);
 
-  // Calculate the day of week for the first day of the month (0 = Sunday, 1 = Monday, etc.)
+  // Calculate the day of week for the first day of the month (segunda-feira-based: 0 = Seg, 6 = Dom)
   const firstDayOffset = useMemo(() => {
-    const firstDay = new Date(selectedYear, selectedMonth, 1).getDay();
-    // Convert to Monday-based (0 = Monday, 6 = Sunday)
-    return firstDay === 0 ? 6 : firstDay - 1;
+    const sundayBased = new Date(selectedYear, selectedMonth, 1).getDay(); // 0 = Dom, 1 = Seg, ...
+    // Convert para base segunda-feira: 0 = Seg, ..., 6 = Dom
+    return (sundayBased + 6) % 7;
   }, [selectedMonth, selectedYear]);
 
   // Get planned vacation days for the selected user and month
@@ -232,36 +232,56 @@ const Planning: React.FC = () => {
         {/* Calendar Grid */}
         <div className="flex-grow overflow-auto p-4 bg-slate-50 dark:bg-slate-900">
           <div className="bg-white dark:bg-surface-dark rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-slate-200 dark:border-slate-800">
+            <div className="grid grid-cols-7 border-b-2 border-slate-200 dark:border-slate-800">
               {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d, idx) => (
-                <div key={d} className={`py-2 text-center text-[11px] font-bold uppercase bg-slate-50 dark:bg-slate-900/50 ${idx >= 5 ? 'text-red-500' : 'text-slate-500'}`}>
+                <div 
+                  key={d} 
+                  className={`py-2.5 text-center text-[11px] font-bold uppercase bg-slate-50 dark:bg-slate-900/50 border-r border-slate-200 dark:border-slate-800 last:border-r-0 ${idx >= 5 ? 'text-red-500' : 'text-slate-500 dark:text-slate-400'}`}
+                >
                   {d}
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-7">
-              {/* Empty leading days for visual alignment based on the first day of the month */}
-              {Array.from({ length: firstDayOffset }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-16 sm:h-20 border-r border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30" />
-              ))}
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                const day = i + 1;
+              {Array.from({ length: 42 }).map((_, index) => {
+                const day = index - firstDayOffset + 1;
+                const isInCurrentMonth = day > 0 && day <= daysInMonth;
+
+                // Célula vazia (antes ou depois dos dias do mês) para manter grade 6x7 estável
+                if (!isInCurrentMonth) {
+                  const colIndex = index % 7;
+                  return (
+                    <div
+                      key={`empty-${index}`}
+                      className={`h-16 sm:h-20 border-r border-b border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/30 ${colIndex === 6 ? 'border-r-0' : ''}`}
+                    />
+                  );
+                }
+
                 const isSelected = plannedVacations.includes(day);
-                const dayIdxInWeek = (i + firstDayOffset) % 7;
+                
+                // Calculate the actual day of week for this date
+                const date = new Date(selectedYear, selectedMonth, day);
+                const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+                // Convert to Monday-based: 0=Monday, 1=Tuesday, ..., 6=Sunday
+                const dayIdxInWeek = (dayOfWeek + 6) % 7;
                 const isWeekend = dayIdxInWeek === 5 || dayIdxInWeek === 6; // Saturday (5) or Sunday (6)
                 const isSaving = savingDay === day;
 
+                const colIndex = index % 7;
+                
                 return (
                   <button
-                    key={day}
+                    key={index}
                     onClick={() => toggleDay(day)}
                     disabled={isSaving}
                     className={`h-16 sm:h-20 border-r border-b border-slate-100 dark:border-slate-800 p-1.5 text-left flex flex-col transition-all relative group disabled:opacity-70
+                      ${colIndex === 6 ? 'border-r-0' : ''}
                       ${isWeekend ? 'bg-red-50/30 dark:bg-red-900/10' : ''}
                       ${isSelected ? 'bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
                     `}
                   >
-                    <span className={`text-xs font-bold ${isWeekend ? 'text-red-500' : 'dark:text-white'}`}>{day}</span>
+                    <span className={`text-xs sm:text-sm font-bold leading-none ${isWeekend ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>{day}</span>
                     {isSaving ? (
                       <div className="mt-auto w-full h-6 bg-slate-200 dark:bg-slate-700 rounded-md flex items-center justify-center animate-pulse">
                         <div className="h-3 w-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />

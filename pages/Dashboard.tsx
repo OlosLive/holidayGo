@@ -1,19 +1,47 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User } from '../types';
 import { generateTeamSummary } from '../geminiService';
+import { useProfiles } from '../hooks/useProfiles';
+import { useVacations } from '../hooks/useVacations';
+import type { Profile } from '../types/database';
 
-interface DashboardProps {
-  users: User[];
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ users }) => {
+const Dashboard: React.FC = () => {
+  const { profiles, loading: profilesLoading, error: profilesError } = useProfiles();
+  const { 
+    vacations,
+    loading: vacationsLoading, 
+    getVacationDays
+  } = useVacations();
   const [viewMode, setViewMode] = useState<'mensal' | 'anual'>('mensal');
   const [selectedMonth, setSelectedMonth] = useState(6); // Julho (0-indexed)
   const [selectedYear, setSelectedYear] = useState(2026);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
+
+  // Convert profiles to User format for compatibility
+  // Note: useVacations already fetches all vacations on mount, so we just filter locally
+  const users: User[] = useMemo(() => {
+    return profiles.map((profile: Profile): User => {
+      // Get vacation days for the selected month/year
+      const vacationDays = getVacationDays(profile.id, selectedYear, selectedMonth + 1);
+      
+      return {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email || '',
+        role: profile.role || 'Colaborador',
+        department: profile.department || 'Geral',
+        hireDate: profile.created_at || new Date().toISOString(),
+        status: 'Ativo' as const,
+        vacationBalance: profile.vacation_balance || 30,
+        vacationUsed: profile.vacation_used || 0,
+        lastAccess: profile.updated_at || null,
+        plannedVacations: vacationDays,
+      };
+    });
+  }, [profiles, selectedYear, selectedMonth, getVacationDays]);
 
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
@@ -46,19 +74,16 @@ const Dashboard: React.FC<DashboardProps> = ({ users }) => {
 
   const handleGetAiSummary = async () => {
     setIsLoadingSummary(true);
-    const summary = await generateTeamSummary(users);
+    const summary = await generateTeamSummary(users, viewMode, selectedMonth, selectedYear);
     setAiSummary(summary);
     setIsLoadingSummary(false);
   };
 
   // Get real vacation data for a user in a specific month
   const getAnnualData = (user: User, monthIdx: number) => {
-    // Only July 2026 has real data in the system
-    if (monthIdx === 6 && selectedYear === 2026) {
-      return user.plannedVacations.length;
-    }
-    // Other months have no data yet
-    return 0;
+    // Get vacation days for this user in the specified month/year
+    const vacationDays = getVacationDays(user.id, selectedYear, monthIdx + 1);
+    return vacationDays.length;
   };
 
   // Calculate monthly totals for the team
@@ -76,6 +101,29 @@ const Dashboard: React.FC<DashboardProps> = ({ users }) => {
 
   // Get current month (0-indexed)
   const currentMonth = new Date().getMonth();
+
+  // Loading state
+  if (profilesLoading || vacationsLoading) {
+    return (
+      <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-[1920px] mx-auto flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="h-12 w-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 dark:text-slate-400 font-medium">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (profilesError) {
+    return (
+      <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-[1920px] mx-auto">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6">
+          <p className="text-red-600 dark:text-red-400 font-medium">Erro ao carregar dados: {profilesError}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-8 px-4 sm:px-6 lg:px-8 max-w-[1920px] mx-auto">
@@ -190,8 +238,8 @@ const Dashboard: React.FC<DashboardProps> = ({ users }) => {
                     {daysHeader.map((day, idx) => {
                       const label = getMonthWeekDays[idx];
                       const isWeekend = label === 'S' || label === 'D';
-                      // For now, we only highlight if it's the "selected" month (Jul 2026 mock)
-                      const isVacation = (selectedMonth === 6 && selectedYear === 2026) && user.plannedVacations.includes(day);
+                      // Check if this day is in the user's planned vacations
+                      const isVacation = user.plannedVacations.includes(day);
                       return (
                         <td key={day} className={`border-l border-slate-100 dark:border-slate-800/50 h-10 p-0.5 ${isWeekend ? 'bg-slate-50/30 dark:bg-slate-800/10' : ''}`}>
                           {isVacation && (
